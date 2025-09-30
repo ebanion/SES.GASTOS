@@ -1,8 +1,8 @@
-﻿# app/main.py
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from .db import Base, engine
-from . import models              # <-- importa modelos para create_all
-from .routers import reservations # <-- importa el router
+from . import models
+from .routers import reservations
 
 app = FastAPI(title="OPS Core (DINERO)")
 
@@ -15,4 +15,8 @@ except Exception as e:
 def health():
     return {"ok": True}
 
-# monta el router bajo /api/v1/r
+@app.get("/")
+def root():
+    return RedirectResponse(url="/docs")
+
+app.include_router(reservations.router)
