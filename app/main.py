@@ -1,9 +1,11 @@
-﻿from fastapi import FastAPI
+﻿# app/main.py
+from fastapi import FastAPI
 from .db import Base, engine
+from . import models              # <-- importa modelos para create_all
+from .routers import reservations # <-- importa el router
 
 app = FastAPI(title="OPS Core (DINERO)")
 
-# Crear tablas si hay modelos cargados; no fallar si la DB no está lista aún
 try:
     Base.metadata.create_all(bind=engine)
 except Exception as e:
@@ -12,3 +14,5 @@ except Exception as e:
 @app.get("/health")
 def health():
     return {"ok": True}
+
+# monta el router bajo /api/v1/r
