@@ -2,15 +2,17 @@
 from fastapi.responses import RedirectResponse
 from .db import Base, engine
 from . import models
-from .routers import reservations
-from .routers import admin
+from .routers import reservations, admin
 
 app = FastAPI(title="OPS Core (DINERO)")
 
-try:
-    Base.metadata.create_all(bind=engine)
-except Exception as e:
-    print(f"[init] DB init skipped: {e}")
+@app.on_event("startup")
+def ensure_db():
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("[startup] DB ready")
+    except Exception as e:
+        print(f"[startup] create_all failed: {e}")
 
 @app.get("/health")
 def health():
