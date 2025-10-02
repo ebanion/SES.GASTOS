@@ -1,15 +1,16 @@
 ﻿# app/main.py
+from __future__ import annotations
+
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
-from .routers import reservations, expenses, admin, apartments
 
-# Asegúrate de importar modelos ANTES de create_all()
-from . import models  # noqa: F401  (necesario para que SQLAlchemy conozca las tablas)
+# Importa modelos ANTES de create_all para que SQLAlchemy conozca las tablas
+from . import models  # noqa: F401
 
 from .db import Base, engine
-from .routers import reservations, expenses, admin
+from .routers import reservations, expenses, admin, apartments
 
-app = FastAPI(title="SES.GASTOS")
+app = FastAPI(title="SES.GASTOS", version="0.1.0")
 
 # Crear tablas al arrancar (si faltan)
 @app.on_event("startup")
