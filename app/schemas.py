@@ -1,27 +1,35 @@
+
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, Literal
 from datetime import date
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from decimal import Decimal
 
-class ReservationIn(BaseModel):
-    check_in: date
-    check_out: date
-    guests: int
-    channel: str = "manual"
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
+ExpenseCategory = Literal[
+    "internet","limpieza","lavanderia","gas","electricidad",
+    "reparaciones","suministros","comisiones","otros"
+]
 
-class ReservationOut(BaseModel):
-    reservation_id: str
-from uuid import UUID
-from datetime import date
-from typing import Optional
-from pydantic import BaseModel, EmailStr
+class ApartmentIn(BaseModel):
+    code: str = Field(..., max_length=50)
+    name: str = Field(..., max_length=120)
+    owner_email: Optional[EmailStr] = None
+    telegram_chat_id: Optional[str] = None
 
-class ReservationSyncIn(BaseModel):
-    booking_id: UUID
-    check_in: date
-    check_out: date
-    guests: int
-    channel: str = "manual"
-    email: EmailStr | None = None
-    phone: Optional[str] = None
+class ApartmentOut(ApartmentIn):
+    id: str
+
+class ExpenseIn(BaseModel):
+    apartment_id: str
+    date: date
+    category: ExpenseCategory
+    amount_gross: Decimal
+    vat_rate: Decimal = Decimal("21.0")
+    currency: str = "EUR"
+    vendor: Optional[str] = None
+    description: Optional[str] = None
+    file_url: Optional[str] = None
+    status: Optional[Literal["PENDING","OK"]] = "PENDING"
+
+class ExpenseOut(ExpenseIn):
+    id: str
+

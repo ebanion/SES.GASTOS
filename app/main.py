@@ -3,8 +3,10 @@ from fastapi.responses import RedirectResponse
 from .db import Base, engine
 from . import models
 from .routers import reservations, admin
+from .routers import reservations, expenses   # <-- añade expenses
 
 app = FastAPI(title="OPS Core (DINERO)")
+app = FastAPI(title="SES.GASTOS")
 
 @app.on_event("startup")
 def ensure_db():
@@ -24,3 +26,6 @@ def root():
 
 app.include_router(reservations.router)
 app.include_router(admin.router)
+
+app.include_router(reservations.router)
+app.include_router(expenses.router)          # <-- añade esta línea

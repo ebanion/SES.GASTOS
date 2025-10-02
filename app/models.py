@@ -1,40 +1,37 @@
+# --- NUEVO: Apartamentos y Gastos ---
+from sqlalchemy import Column, String, Text, Date, Numeric, ForeignKey, Boolean, func
+from sqlalchemy.orm import relationship
 import uuid
-from datetime import datetime, date
-from sqlalchemy import (
-    Column, String, Integer, Date, DateTime, JSON, Enum, UniqueConstraint, Index, Text
-)
-from sqlalchemy.dialects.postgresql import UUID
-from .db import Base
 
-class Reservation(Base):
-    __tablename__ = "reservations"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    check_in = Column(Date, nullable=False)
-    check_out = Column(Date, nullable=False)
-    guests = Column(Integer, nullable=False)
-    channel = Column(String(40), default="manual")
-    email_contact = Column(String(180))
-    phone_contact = Column(String(60))
-    status = Column(String(20), default="CREATED")  # CREATED | CONFIRMED | CANCELLED
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+def _uuid():
+    return str(uuid.uuid4())
 
-    __table_args__ = (
-        Index("ix_res_checkin", "check_in"),
-    )
+class Apartment(Base):
+    __tablename__ = "apartments"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    code = Column(String(50), unique=True, nullable=False)
+    name = Column(String(120), nullable=False)
+    owner_email = Column(String(200), nullable=True)
+    telegram_chat_id = Column(String(64), nullable=True)
+    active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(String(32), nullable=False, default=lambda: func.now())
+    expenses = relationship("Expense", back_populates="apartment", cascade="all, delete-orphan")
 
-class IdempotencyKey(Base):
-    __tablename__ = "idempotency_keys"
-    key = Column(String(80), primary_key=True)
-    request_hash = Column(String(64), nullable=False)
-    response_json = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+class Expense(Base):
+    __tablename__ = "expenses"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    apartment_id = Column(String(36), ForeignKey("apartments.id", ondelete="CASCADE"), nullable=False)
+    date = Column(Date, nullable=False)
+    category = Column(String(32), nullable=False)
+    vendor = Column(String(120), nullable=True)
+    description = Column(Text, nullable=True)
+    currency = Column(String(3), nullable=False, default="EUR")
+    amount_gross = Column(Numeric(12, 2), nullable=False)
+    vat_rate = Column(Numeric(5, 2), nullable=False, default=21.00)
+    file_url = Column(Text, nullable=True)
+    status = Column(String(16), nullable=False, default="PENDING")
+    created_at = Column(String(32), nullable=False, default=lambda: func.now())
+    apartment = relationship("Apartment", back_populates="expenses")
+    created_at = Column(String(32), nullable=False, default=lambda: func.now())
+    apartment = relationship("Apartment", back_populates="expenses")
 
-class OutboxEvent(Base):
-    __tablename__ = "outbox_events"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    type = Column(String(60), nullable=False)  # e.g., ReservationCreated
-    payload = Column(JSON, nullable=False)
-    status = Column(String(20), default="PENDING")  # PENDING | SENT | FAILED
-    tries = Column(Integer, default=0, nullable=False)
-    last_error = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
