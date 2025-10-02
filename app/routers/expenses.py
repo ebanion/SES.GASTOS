@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..db import get_db
 from .. import models, schemas
@@ -6,9 +6,13 @@ import os
 
 router = APIRouter(prefix="/api/v1", tags=["expenses"])
 
-def _require_internal(key: str | None):
-    admin = os.getenv("Jajeji29.")
-    if not admin or key != admin:
+def _require_internal(
+    x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
+    key: str | None = Query(default=None),
+):
+    admin = os.getenv("ADMIN_KEY", "")
+    provided = x_internal_key or key
+    if not admin or provided != admin:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 # -------- Apartamentos --------
