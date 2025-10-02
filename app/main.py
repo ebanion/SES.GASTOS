@@ -1,6 +1,7 @@
 ﻿# app/main.py
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
+from .routers import reservations, expenses, admin, apartments
 
 # Asegúrate de importar modelos ANTES de create_all()
 from . import models  # noqa: F401  (necesario para que SQLAlchemy conozca las tablas)
@@ -30,4 +31,5 @@ def root():
 # Routers (registrados una sola vez)
 app.include_router(reservations.router)
 app.include_router(expenses.router)
+app.include_router(apartments.router)
 app.include_router(admin.router)
