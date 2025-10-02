@@ -1,50 +1,68 @@
-﻿from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, Literal
-from datetime import date
+﻿# app/schemas.py
+from __future__ import annotations
+
+from datetime import date, datetime
+from uuid import UUID
 from decimal import Decimal
+from typing import Optional, Literal
+
+from pydantic import BaseModel, EmailStr
+
 
 # ---------- RESERVAS ----------
 class ReservationIn(BaseModel):
     check_in: date
     check_out: date
-    guests: int = Field(ge=1)
+    guests: int
     channel: str = "manual"
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
 
-class ReservationOut(BaseModel):
-    reservation_id: str
 
-class ReservationSyncIn(ReservationIn):
-    booking_id: str
+class ReservationOut(BaseModel):
+    reservation_id: UUID
+
+
+class ReservationSyncIn(BaseModel):
+    """Usado por /api/v1/reservations/sync cuando POLICÍA ya generó el UUID."""
+    booking_id: UUID
+    check_in: date
+    check_out: date
+    guests: int
+    channel: str = "manual"
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+
 
 # ---------- APARTAMENTOS ----------
-class ApartmentIn(BaseModel):
-    code: str = Field(..., max_length=50)
-    name: str = Field(..., max_length=120)
+class ApartmentCreate(BaseModel):
+    code: str
+    name: Optional[str] = None
     owner_email: Optional[EmailStr] = None
-    telegram_chat_id: Optional[str] = None
 
-class ApartmentOut(ApartmentIn):
-    id: str
+
+class ApartmentOut(BaseModel):
+    id: UUID
+    code: str
+    name: Optional[str] = None
+    owner_email: Optional[EmailStr] = None
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+
 
 # ---------- GASTOS ----------
-ExpenseCategory = Literal[
-    "internet","limpieza","lavanderia","gas","electricidad",
-    "reparaciones","suministros","comisiones","otros"
-]
-
 class ExpenseIn(BaseModel):
-    apartment_id: str
+    apartment_id: UUID
     date: date
-    category: ExpenseCategory
-    amount_gross: Decimal
-    vat_rate: Decimal = Decimal("21.0")
-    currency: str = "EUR"
+    category: Optional[str] = None
     vendor: Optional[str] = None
     description: Optional[str] = None
+    currency: str = "EUR"
+    amount_gross: Decimal
+    vat_rate: Optional[int] = None
     file_url: Optional[str] = None
-    status: Optional[Literal["PENDING","OK"]] = "PENDING"
+    status: Literal["PENDING", "PAID", "CANCELLED"] = "PENDING"
+
 
 class ExpenseOut(ExpenseIn):
-    id: str
+    id: UUID
