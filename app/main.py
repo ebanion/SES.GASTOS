@@ -1,15 +1,18 @@
-﻿from fastapi import FastAPI
+﻿# app/main.py
+from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
-from .db import Base, engine
-from . import models
-from .routers import reservations, admin
-from .routers import reservations, expenses   # <-- añade expenses
 
-app = FastAPI(title="OPS Core (DINERO)")
+# Asegúrate de importar modelos ANTES de create_all()
+from . import models  # noqa: F401  (necesario para que SQLAlchemy conozca las tablas)
+
+from .db import Base, engine
+from .routers import reservations, expenses, admin
+
 app = FastAPI(title="SES.GASTOS")
 
+# Crear tablas al arrancar (si faltan)
 @app.on_event("startup")
-def ensure_db():
+def on_startup() -> None:
     try:
         Base.metadata.create_all(bind=engine)
         print("[startup] DB ready")
@@ -24,8 +27,7 @@ def health():
 def root():
     return RedirectResponse(url="/docs")
 
+# Routers (registrados una sola vez)
 app.include_router(reservations.router)
+app.include_router(expenses.router)
 app.include_router(admin.router)
-
-app.include_router(reservations.router)
-app.include_router(expenses.router)          # <-- añade esta línea
