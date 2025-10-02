@@ -1,4 +1,6 @@
 ﻿import os, hashlib, json, uuid
+from datetime import date
+from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from ..db import get_db
@@ -7,8 +9,13 @@ from ..services.events import notify_ses_reservation_created
 
 router = APIRouter(prefix="/api/v1/reservations", tags=["reservations"])
 
-def _hash_body(body: dict) -> str:
-    return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+
+def _hash_body_safe(body: dict) -> str:
+    # Soporta dates/UUIDs sin romper
+    return hashlib.sha256(
+        json.dumps(body, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()
+
 
 @router.post("", response_model=schemas.ReservationOut)
 def create_reservation(
@@ -17,16 +24,24 @@ def create_reservation(
     db: Session = Depends(get_db),
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ):
-    # Idempotencia simple: misma key + mismo hash => devolvemos misma respuesta
-    body_hash = _hash_body(payload.dict())
+    # Pydantic v1/v2 compat
+    data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+
+    # Idempotencia: SOLO si nos pasan cabecera
+    body_hash = None
     if x_idempotency_key:
-        idem = db.query(models.IdempotencyKey).filter(models.IdempotencyKey.key == x_idempotency_key).first()
+        body_hash = _hash_body_safe(data)
+        idem = (
+            db.query(models.IdempotencyKey)
+            .filter(models.IdempotencyKey.key == x_idempotency_key)
+            .first()
+        )
         if idem:
             if idem.request_hash != body_hash:
-                raise HTTPException(409, "Idempotency-Key en uso con otro cuerpo")
+                raise HTTPException(status_code=409, detail="Idempotency-Key en uso con otro cuerpo")
             return idem.response_json
 
-    # Crear reserva (UUID generado por GASTOS)
+    # Crear reserva (UUID generado aquí)
     r = models.Reservation(
         check_in=payload.check_in,
         check_out=payload.check_out,
@@ -35,20 +50,27 @@ def create_reservation(
         email_contact=payload.email,
         phone_contact=payload.phone,
     )
-    db.add(r); db.commit(); db.refresh(r)
+    try:
+        db.add(r); db.commit(); db.refresh(r)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="db_insert_failed")
 
     response = {"reservation_id": str(r.id)}
 
     # Guardar idempotencia (si aplica)
-    if x_idempotency_key:
-        idem = models.IdempotencyKey(
-            key=x_idempotency_key,
-            request_hash=body_hash,
-            response_json=response
-        )
-        db.add(idem); db.commit()
+    if x_idempotency_key and body_hash:
+        try:
+            idem = models.IdempotencyKey(
+                key=x_idempotency_key,
+                request_hash=body_hash,
+                response_json=response,
+            )
+            db.add(idem); db.commit()
+        except Exception:
+            db.rollback()  # no rompemos la petición si falla el registro idem
 
-    # Notificar a SES.HOSPEDAJES en background (fuego y olvido)
+    # Notificar a SES.HOSPEDAJES en background (puedes desactivar si no lo quieres)
     background.add_task(
         notify_ses_reservation_created,
         {
@@ -60,32 +82,30 @@ def create_reservation(
             "email": r.email_contact,
             "phone": r.phone_contact,
         },
-        x_idempotency_key or str(uuid.uuid4())
     )
 
     return response
 
-# === NUEVO: crear/forzar una reserva con UUID dado por POLICÍA ===
+
+# === /sync: inserta/usa el MISMO UUID que generó POLICÍA ===
 @router.post("/sync", response_model=schemas.ReservationOut)
-def sync_reservation(
+def sync_reservation_from_police(
     payload: schemas.ReservationSyncIn,
     db: Session = Depends(get_db),
     x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
 ):
-    # Solo flujos internos (n8n/policía)
-    admin = os.getenv("ADMIN_KEY", "")
-    if not admin or x_internal_key != admin:
-        raise HTTPException(403, "forbidden")
+    admin_key = os.getenv("ADMIN_KEY", "")
+    if not admin_key or x_internal_key != admin_key:
+        raise HTTPException(status_code=403, detail="forbidden")
 
-    # Validar UUID y upsert
+    # Validar/normalizar UUID externo
     rid = uuid.UUID(str(payload.booking_id))
 
-    # Si existe, devolvemos tal cual
-    exists = db.query(models.Reservation).filter(models.Reservation.id == rid).first()
-    if exists:
-        return {"reservation_id": str(exists.id)}
+    # Idempotente: si ya existe, devolvemos el mismo
+    existing = db.query(models.Reservation).get(rid)
+    if existing:
+        return {"reservation_id": str(existing.id)}
 
-    # Si no existe, lo creamos con ese UUID
     r = models.Reservation(
         id=rid,
         check_in=payload.check_in,
@@ -95,6 +115,10 @@ def sync_reservation(
         email_contact=payload.email,
         phone_contact=payload.phone,
     )
-    db.add(r); db.commit()
+    try:
+        db.add(r); db.commit(); db.refresh(r)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="db_insert_failed")
 
-    return {"reservation_id": str(rid)}
+    return {"reservation_id": str(r.id)}
