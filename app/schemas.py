@@ -51,4 +51,3 @@ class ExpenseIn(BaseModel):
 
 class ExpenseOut(ExpenseIn):
     id: str
-
