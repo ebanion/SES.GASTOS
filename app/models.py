@@ -1,10 +1,11 @@
-# --- NUEVO: Apartamentos y Gastos ---
-from sqlalchemy import Column, String, Text, Date, Numeric, ForeignKey, Boolean, func
+from .db import Base
+from sqlalchemy import Column, String, Text, Date, Numeric, ForeignKey, Boolean, DateTime, func
 from sqlalchemy.orm import relationship
 import uuid
 
 def _uuid():
-    return str(uuid.uuid4())
+    import uuid as _u
+    return str(_u.uuid4())
 
 class Apartment(Base):
     __tablename__ = "apartments"
@@ -14,7 +15,7 @@ class Apartment(Base):
     owner_email = Column(String(200), nullable=True)
     telegram_chat_id = Column(String(64), nullable=True)
     active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(String(32), nullable=False, default=lambda: func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     expenses = relationship("Expense", back_populates="apartment", cascade="all, delete-orphan")
 
 class Expense(Base):
@@ -30,8 +31,6 @@ class Expense(Base):
     vat_rate = Column(Numeric(5, 2), nullable=False, default=21.00)
     file_url = Column(Text, nullable=True)
     status = Column(String(16), nullable=False, default="PENDING")
-    created_at = Column(String(32), nullable=False, default=lambda: func.now())
-    apartment = relationship("Apartment", back_populates="expenses")
-    created_at = Column(String(32), nullable=False, default=lambda: func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     apartment = relationship("Apartment", back_populates="expenses")
 
