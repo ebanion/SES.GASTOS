@@ -1,6 +1,4 @@
-
-# app/schemas.py
-from pydantic import BaseModel, EmailStr, Field
+﻿from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Literal
 from datetime import date
 from decimal import Decimal
@@ -17,7 +15,6 @@ class ReservationIn(BaseModel):
 class ReservationOut(BaseModel):
     reservation_id: str
 
-# Para el endpoint /api/v1/reservations/sync (reserva con booking_id externo)
 class ReservationSyncIn(ReservationIn):
     booking_id: str
 
