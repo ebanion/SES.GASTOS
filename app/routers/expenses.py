@@ -30,7 +30,7 @@ def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
     e = models.Expense(
         apartment_id=payload.apartment_id,
         date=payload.date,
-        amount=payload.amount_gross,  # <-- map a la columna 'amount'
+        amount=payload.amount_gross,  # <-- mapea al campo 'amount' del modelo
         currency=payload.currency,
         category=payload.category,
         description=payload.description,
@@ -38,7 +38,7 @@ def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
         invoice_number=payload.invoice_number,
         source=payload.source,
     )
-    # Campos opcionales (si existen en el modelo/DB)
+    # Campos opcionales si existen en el modelo/DB
     if hasattr(models.Expense, "vat_rate"):
         e.vat_rate = payload.vat_rate
     if hasattr(models.Expense, "file_url"):
@@ -54,7 +54,7 @@ def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
         id=e.id,
         apartment_id=e.apartment_id,
         date=e.date,
-        amount_gross=e.amount,  # <-- devolvemos con el nombre del schema
+        amount_gross=e.amount,  # devolvemos con el nombre del schema
         currency=e.currency,
         category=e.category,
         description=e.description,
@@ -67,8 +67,11 @@ def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
     )
 
 
-@router.get("", response_model=list[schemas.ExpenseOut]])
-def list_expenses(apartment_id: str | None = None, db: Session = Depends(get_db)):
+@router.get("", response_model=list[schemas.ExpenseOut])
+def list_expenses(
+    apartment_id: str | None = None,
+    db: Session = Depends(get_db),
+):
     q = db.query(models.Expense)
     if apartment_id:
         q = q.filter(models.Expense.apartment_id == apartment_id)
@@ -93,5 +96,4 @@ def list_expenses(apartment_id: str | None = None, db: Session = Depends(get_db)
         )
         for r in rows
     ]
-
 
