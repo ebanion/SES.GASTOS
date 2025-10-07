@@ -94,3 +94,4 @@ def list_expenses(apartment_id: str | None = None, db: Session = Depends(get_db)
         for r in rows
     ]
 
+
