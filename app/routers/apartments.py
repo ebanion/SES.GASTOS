@@ -15,10 +15,22 @@ def require_internal_key(
     if x_internal_key != os.getenv("ADMIN_KEY"):
         raise HTTPException(status_code=403, detail="Forbidden")
 
-@router.post("", response_model=schemas.ApartmentOut, dependencies=[Depends(require_internal_key)])
+@router.post(
+    "",
+    response_model=schemas.ApartmentOut,
+    dependencies=[Depends(require_internal_key)],
+)
 def create_apartment(payload: schemas.ApartmentCreate, db: Session = Depends(get_db)):
+    code = payload.code.strip()
+
+    # 1) Idempotencia por code: si ya existe, devolverlo (200)
+    existing = db.query(models.Apartment).filter(models.Apartment.code == code).first()
+    if existing:
+        return existing
+
+    # 2) Intentar insertar
     apt = models.Apartment(
-        code=payload.code.strip(),
+        code=code,
         name=(payload.name or "").strip(),
         owner_email=(payload.owner_email or None),
         is_active=True,
@@ -29,20 +41,21 @@ def create_apartment(payload: schemas.ApartmentCreate, db: Session = Depends(get
         db.refresh(apt)
         return apt
     except IntegrityError as e:
-        # Si ya existe, devolvemos el existente (idempotente) en 200
         db.rollback()
-        print(f"[apartments] IntegrityError on insert: {e}")
-        existing = (
-            db.query(models.Apartment)
-            .filter(models.Apartment.code == payload.code.strip())
-            .first()
-        )
+        # Doble verificación por si fue una carrera y ya existe
+        existing = db.query(models.Apartment).filter(models.Apartment.code == code).first()
         if existing:
             return existing
-        # Si por lo que sea no lo encontramos, sí devolvemos 409
-        raise HTTPException(status_code=409, detail="apartment_code_already_exists")
+        # Si no, exponer error real para depurar en logs
+        print(f"[apartments] IntegrityError on insert: {e}")
+        raise HTTPException(status_code=500, detail="integrity_error")
 
 @router.get("", response_model=list[schemas.ApartmentOut])
 def list_apartments(db: Session = Depends(get_db)):
-    return db.query(models.Apartment).order_by(models.Apartment.created_at.desc()).all()
+    return (
+        db.query(models.Apartment)
+        .order_by(models.Apartment.created_at.desc())
+        .all()
+    )
+
 
