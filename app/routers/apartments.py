@@ -17,7 +17,6 @@ def require_internal_key(
 
 @router.post("", response_model=schemas.ApartmentOut, dependencies=[Depends(require_internal_key)])
 def create_apartment(payload: schemas.ApartmentCreate, db: Session = Depends(get_db)):
-    # Sin pre-check (estaba dando 409 falsos). Confiamos en UNIQUE y capturamos IntegrityError.
     apt = models.Apartment(
         code=payload.code.strip(),
         name=(payload.name or "").strip(),
@@ -28,11 +27,20 @@ def create_apartment(payload: schemas.ApartmentCreate, db: Session = Depends(get
         db.add(apt)
         db.commit()
         db.refresh(apt)
-    except IntegrityError:
+        return apt
+    except IntegrityError as e:
+        # Si ya existe, devolvemos el existente (idempotente) en 200
         db.rollback()
+        print(f"[apartments] IntegrityError on insert: {e}")
+        existing = (
+            db.query(models.Apartment)
+            .filter(models.Apartment.code == payload.code.strip())
+            .first()
+        )
+        if existing:
+            return existing
+        # Si por lo que sea no lo encontramos, sí devolvemos 409
         raise HTTPException(status_code=409, detail="apartment_code_already_exists")
-
-    return apt
 
 @router.get("", response_model=list[schemas.ApartmentOut])
 def list_apartments(db: Session = Depends(get_db)):
