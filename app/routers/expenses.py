@@ -10,7 +10,6 @@ from .. import models, schemas
 
 router = APIRouter(prefix="/api/v1/expenses", tags=["expenses"])
 
-
 def require_internal_key(
     x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
     key: str | None = Query(default=None),
@@ -20,17 +19,19 @@ def require_internal_key(
     if not admin or provided != admin:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-
 @router.post("", response_model=schemas.ExpenseOut, dependencies=[Depends(require_internal_key)])
 def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
-    apt = db.query(models.Apartment).filter(models.Apartment.id == payload.apartment_id).first()
+    # DB tiene apartments.id como VARCHAR(36); payload.apartment_id es UUID en schema
+    apt_id_str = str(payload.apartment_id)
+
+    apt = db.query(models.Apartment).filter(models.Apartment.id == apt_id_str).first()
     if not apt:
         raise HTTPException(status_code=404, detail="apartment_not_found")
 
     e = models.Expense(
-        apartment_id=payload.apartment_id,
+        apartment_id=apt_id_str,
         date=payload.date,
-        amount=payload.amount_gross,  # <-- mapea al campo 'amount' del modelo
+        amount=payload.amount_gross,  # mapea al campo 'amount'
         currency=payload.currency,
         category=payload.category,
         description=payload.description,
@@ -38,7 +39,7 @@ def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
         invoice_number=payload.invoice_number,
         source=payload.source,
     )
-    # Campos opcionales si existen en el modelo/DB
+    # Campos opcionales si existen
     if hasattr(models.Expense, "vat_rate"):
         e.vat_rate = payload.vat_rate
     if hasattr(models.Expense, "file_url"):
@@ -52,9 +53,9 @@ def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
 
     return schemas.ExpenseOut(
         id=e.id,
-        apartment_id=e.apartment_id,
+        apartment_id=e.apartment_id,   # Pydantic acepta str y lo expone como UUID
         date=e.date,
-        amount_gross=e.amount,  # devolvemos con el nombre del schema
+        amount_gross=e.amount,
         currency=e.currency,
         category=e.category,
         description=e.description,
@@ -65,7 +66,6 @@ def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
         file_url=getattr(e, "file_url", None),
         status=getattr(e, "status", None),
     )
-
 
 @router.get("", response_model=list[schemas.ExpenseOut])
 def list_expenses(
@@ -96,4 +96,5 @@ def list_expenses(
         )
         for r in rows
     ]
+
 
