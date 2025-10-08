@@ -3,12 +3,9 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..db import get_db
 from .. import models, schemas
@@ -19,7 +16,8 @@ router = APIRouter(prefix="/api/v1/apartments", tags=["apartments"])
 def require_internal_key(
     x_internal_key: str | None = Header(default=None, alias="X-Internal-Key")
 ):
-    if x_internal_key != os.getenv("ADMIN_KEY"):
+    admin = os.getenv("ADMIN_KEY", "")
+    if not admin or x_internal_key != admin:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
@@ -29,66 +27,42 @@ def require_internal_key(
     dependencies=[Depends(require_internal_key)],
 )
 def create_apartment(payload: schemas.ApartmentCreate, db: Session = Depends(get_db)):
-    code = payload.code.strip()
-    name = (payload.name or "").strip()
-    owner = (payload.owner_email or None)
-    now_utc = datetime.now(timezone.utc)
+    # normaliza strings opcionales sin romper si vienen None
+    code = (payload.code or "").strip()
+    name = (payload.name or "").strip() or None
+    owner_email = payload.owner_email or None
+
+    if not code:
+        raise HTTPException(status_code=422, detail="code_required")
+
+    # evita 500 si ya existe
+    existing = db.query(models.Apartment).filter(models.Apartment.code == code).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="apartment_code_already_exists")
+
+    apt = models.Apartment(
+        code=code,
+        name=name,
+        owner_email=owner_email,
+        # evita NOT NULL en esquemas antiguos sin default
+        created_at=datetime.now(timezone.utc),
+        is_active=True,
+    )
 
     try:
-        # UPSERT idempotente por "code"
-        stmt = (
-            pg_insert(models.Apartment)
-            .values(
-                code=code,
-                name=name,
-                owner_email=owner,
-                is_active=True,
-                created_at=now_utc,   # <- garantizamos NOT NULL
-            )
-            .on_conflict_do_nothing(index_elements=[models.Apartment.code])
-            .returning(models.Apartment.id)
-        )
-        row = db.execute(stmt).first()
-        if row is None:
-            # ya existía → devolvemos el existente
-            apt = db.execute(
-                select(models.Apartment).where(models.Apartment.code == code)
-            ).scalar_one()
-            return apt
-        else:
-            db.commit()
-            apt_id = row[0]
-            apt = db.query(models.Apartment).filter_by(id=apt_id).first()
-            return apt
-
-    except Exception:
-        # Fallback seguro si algo raro pasa con el dialecto/índice
+        db.add(apt)
+        db.commit()
+        db.refresh(apt)
+    except IntegrityError:
         db.rollback()
-        try:
-            existing = (
-                db.query(models.Apartment).filter(models.Apartment.code == code).first()
-            )
-            if existing:
-                return existing
-            apt = models.Apartment(
-                code=code,
-                name=name,
-                owner_email=owner,
-                is_active=True,
-                created_at=now_utc,
-            )
-            db.add(apt)
-            db.commit()
-            db.refresh(apt)
-            return apt
-        except IntegrityError:
-            db.rollback()
-            existing = (
-                db.query(models.Apartment).filter(models.Apartment.code == code).first()
-            )
-            if existing:
-                return existing
-            raise HTTPException(status_code=500, detail="integrity_error")
+        # carrera o unique en DB
+        raise HTTPException(status_code=409, detail="apartment_code_already_exists")
+    except Exception as e:
+        db.rollback()
+        # log amable para ver el motivo real durante estos tests
+        raise HTTPException(status_code=500, detail=f"create_failed: {e!s}")
+
+    return apt
 
 
 @router.get("", response_model=list[schemas.ApartmentOut])
@@ -98,4 +72,14 @@ def list_apartments(db: Session = Depends(get_db)):
         .order_by(models.Apartment.created_at.desc())
         .all()
     )
+
+
+@router.get("/by_code/{code}", response_model=schemas.ApartmentOut)
+def get_by_code(code: str, db: Session = Depends(get_db)):
+    apt = db.query(models.Apartment).filter(models.Apartment.code == code).first()
+    if not apt:
+        raise HTTPException(status_code=404, detail="not_found")
+    return apt
+
+
 
