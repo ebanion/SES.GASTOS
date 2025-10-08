@@ -10,6 +10,7 @@ from .. import models, schemas
 
 router = APIRouter(prefix="/api/v1/expenses", tags=["expenses"])
 
+
 def require_internal_key(
     x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
     key: str | None = Query(default=None),
@@ -19,33 +20,27 @@ def require_internal_key(
     if not admin or provided != admin:
         raise HTTPException(status_code=403, detail="Forbidden")
 
+
 @router.post("", response_model=schemas.ExpenseOut, dependencies=[Depends(require_internal_key)])
 def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
-    # DB tiene apartments.id como VARCHAR(36); payload.apartment_id es UUID en schema
-    apt_id_str = str(payload.apartment_id)
-
-    apt = db.query(models.Apartment).filter(models.Apartment.id == apt_id_str).first()
+    apt = db.query(models.Apartment).filter(models.Apartment.id == payload.apartment_id).first()
     if not apt:
         raise HTTPException(status_code=404, detail="apartment_not_found")
 
     e = models.Expense(
-        apartment_id=apt_id_str,
+        apartment_id=payload.apartment_id,
         date=payload.date,
-        amount=payload.amount_gross,  # mapea al campo 'amount'
+        amount_gross=payload.amount_gross,   # ⬅️ ahora coincide con la BD y el modelo
         currency=payload.currency,
         category=payload.category,
         description=payload.description,
         vendor=payload.vendor,
         invoice_number=payload.invoice_number,
         source=payload.source,
+        vat_rate=payload.vat_rate,
+        file_url=payload.file_url,
+        status=payload.status,
     )
-    # Campos opcionales si existen
-    if hasattr(models.Expense, "vat_rate"):
-        e.vat_rate = payload.vat_rate
-    if hasattr(models.Expense, "file_url"):
-        e.file_url = payload.file_url
-    if hasattr(models.Expense, "status"):
-        e.status = payload.status
 
     db.add(e)
     db.commit()
@@ -53,19 +48,20 @@ def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
 
     return schemas.ExpenseOut(
         id=e.id,
-        apartment_id=e.apartment_id,   # Pydantic acepta str y lo expone como UUID
+        apartment_id=e.apartment_id,
         date=e.date,
-        amount_gross=e.amount,
+        amount_gross=e.amount_gross,  # ⬅️ devolvemos el mismo nombre del schema
         currency=e.currency,
         category=e.category,
         description=e.description,
         vendor=e.vendor,
         invoice_number=e.invoice_number,
         source=e.source,
-        vat_rate=getattr(e, "vat_rate", None),
-        file_url=getattr(e, "file_url", None),
-        status=getattr(e, "status", None),
+        vat_rate=e.vat_rate,
+        file_url=e.file_url,
+        status=e.status,
     )
+
 
 @router.get("", response_model=list[schemas.ExpenseOut])
 def list_expenses(
@@ -83,18 +79,19 @@ def list_expenses(
             id=r.id,
             apartment_id=r.apartment_id,
             date=r.date,
-            amount_gross=r.amount,
+            amount_gross=r.amount_gross,   # ⬅️ importante
             currency=r.currency,
             category=r.category,
             description=r.description,
             vendor=r.vendor,
             invoice_number=r.invoice_number,
             source=r.source,
-            vat_rate=getattr(r, "vat_rate", None),
-            file_url=getattr(r, "file_url", None),
-            status=getattr(r, "status", None),
+            vat_rate=r.vat_rate,
+            file_url=r.file_url,
+            status=r.status,
         )
         for r in rows
     ]
+
 
 

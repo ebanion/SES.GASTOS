@@ -8,15 +8,13 @@ from sqlalchemy import (
     ForeignKey, Numeric, JSON, func
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID
 from .db import Base
 
 # ---------- RESERVAS ----------
 class Reservation(Base):
     __tablename__ = "reservations"
-    # En reservations tu columna id ya es UUID en DB; si allí ya funciona, no lo tocamos
-    from sqlalchemy.dialects.postgresql import UUID as PGUUID
-    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     check_in   = Column(Date, nullable=False)
     check_out  = Column(Date, nullable=False)
     guests     = Column(Integer, nullable=False)
@@ -44,37 +42,45 @@ class IdempotencyKey(Base):
     )
 
 # ---------- APARTAMENTOS ----------
-# IMPORTANTE: en DB 'id' es VARCHAR(36), así que aquí lo alineamos a String(36)
 class Apartment(Base):
     __tablename__ = "apartments"
-    id   = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id   = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code = Column(String(64), unique=True, nullable=False)
     name = Column(String(255))
     owner_email = Column(String(255))
     is_active   = Column(Boolean, default=True)
     created_at  = Column(
         DateTime(timezone=True),
-        nullable=True,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
     expenses = relationship("Expense", back_populates="apartment", cascade="all,delete")
 
 # ---------- GASTOS ----------
-# También alineamos el FK a String(36) para que case con apartments.id
 class Expense(Base):
     __tablename__ = "expenses"
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=False)
-    date     = Column(Date, nullable=False)
-    amount   = Column(Numeric(12, 2), nullable=False)  # mapea amount_gross del schema
-    currency = Column(String(3), nullable=False, default="EUR")
+    # NOTA: dejamos apartment_id como UUID; si tu columna en BD fuese VARCHAR(36),
+    # sigue funcionando porque SQLAlchemy convierte a texto al insertar.
+    apartment_id = Column(UUID(as_uuid=True), ForeignKey("apartments.id"), nullable=False)
+
+    date         = Column(Date, nullable=False)
+    # ⬇️ Muy importante: el nombre de la columna coincide con la BD
+    amount_gross = Column(Numeric(12, 2), nullable=False)
+    currency     = Column(String(3), nullable=False, default="EUR")
 
     category       = Column(String(50))
     description    = Column(String(500))
     vendor         = Column(String(255))
     invoice_number = Column(String(128))
     source         = Column(String(50))
+
+    # Campos opcionales que quizá existan en tu BD (si no, no molestan)
+    vat_rate    = Column(Integer, nullable=True)
+    file_url    = Column(String(512), nullable=True)
+    status      = Column(String(20), nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),
