@@ -61,17 +61,22 @@ class Expense(Base):
     __tablename__ = "expenses"
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 
-    # IMPORTANTE: alineado con BD y schemas
+    # Alineado con DB: String(36) y nombre exacto de columna
     apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=False)
     date         = Column(Date, nullable=False)
-    amount_gross = Column(Numeric(12, 2), nullable=False)  # <-- usamos amount_gross
+    amount_gross = Column(Numeric(12, 2), nullable=False)  # <--- nombre exacto
     currency     = Column(String(3), nullable=False, default="EUR")
 
     category       = Column(String(50))
     description    = Column(String(500))
     vendor         = Column(String(255))
-    invoice_number = Column(String(128))
-    source         = Column(String(50))
+    invoice_number = Column(String(128), nullable=True)
+    source         = Column(String(50), nullable=True)
+
+    # Campos opcionales (por si ya existen en tu DB)
+    vat_rate    = Column(Integer, nullable=True)
+    file_url    = Column(String(500), nullable=True)
+    status      = Column(String(20), nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),
