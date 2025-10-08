@@ -111,5 +111,11 @@ class Income(Base):
     source = Column(String(50))
 
     created_at = Column(
-        D
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
