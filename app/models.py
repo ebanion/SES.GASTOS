@@ -14,8 +14,7 @@ from .db import Base
 # ---------- RESERVAS ----------
 class Reservation(Base):
     __tablename__ = "reservations"
-
-    # IMPORTANTE: UUID para alinearse con la BD (que ya es uuid)
+    # UUID real (coincide con la BD)
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     check_in   = Column(Date, nullable=False)
@@ -47,8 +46,7 @@ class IdempotencyKey(Base):
 # ---------- APARTAMENTOS ----------
 class Apartment(Base):
     __tablename__ = "apartments"
-
-    # En esta app dejamos apartments.id como String(36)
+    # Apartments como String(36), tal y como ya migraste
     id   = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     code = Column(String(64), unique=True, nullable=False)
     name = Column(String(255))
@@ -66,14 +64,10 @@ class Apartment(Base):
 # ---------- GASTOS ----------
 class Expense(Base):
     __tablename__ = "expenses"
-
-    # También String(36) aquí
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 
     apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=False)
     date         = Column(Date, nullable=False)
-
-    # La columna en BD se llama amount_gross -> mantenemos ese nombre
     amount_gross = Column(Numeric(12, 2), nullable=False)
     currency     = Column(String(3), nullable=False, default="EUR")
 
@@ -101,10 +95,9 @@ class Expense(Base):
 class Income(Base):
     __tablename__ = "incomes"
 
-    # PK como UUID
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # FK a reservations (uuid) y a apartments (String(36))
+    # FK: reservations → UUID, apartments → String(36)
     reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=True)
     apartment_id   = Column(String(36), ForeignKey("apartments.id"), nullable=True)
 
@@ -112,17 +105,11 @@ class Income(Base):
     amount_gross = Column(Numeric(12, 2), nullable=False)
     currency     = Column(String(3), nullable=False, default="EUR")
 
-    # PENDING | CONFIRMED | CANCELLED
-    status            = Column(String(20), nullable=False, default="PENDING")
+    status            = Column(String(20), nullable=False, default="PENDING")  # PENDING|CONFIRMED|CANCELLED
     non_refundable_at = Column(Date, nullable=True)
 
-    source = Column(String(50))  # "reservation", "manual", etc.
+    source = Column(String(50))
 
     created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        server_default=func.now(),
-    )
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+        D
 
