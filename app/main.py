@@ -2,15 +2,17 @@
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
-# importa modelos antes de create_all para que SQLAlchemy “conozca” las tablas
-from . import models  # noqa: F401
+# Importa modelos para que SQLAlchemy “conozca” las tablas
+from . import models  # noqa
+
 from .db import Base, engine
 
-# routers
-from .routers import reservations, expenses, apartments, admin, incomes
+# Routers
+from .routers import reservations, expenses, apartments, incomes, admin
 
 app = FastAPI(title="SES.GASTOS")
 
+# Crear/migrar tablas al arrancar
 @app.on_event("startup")
 def on_startup() -> None:
     try:
@@ -27,9 +29,14 @@ def health():
 def root():
     return RedirectResponse(url="/docs")
 
-# registra routers una sola vez
+# Montar routers (orden no crítico, pero admin al final está bien)
 app.include_router(reservations.router)
 app.include_router(expenses.router)
 app.include_router(apartments.router)
+app.include_router(incomes.router)   # <= IMPORTANTE
 app.include_router(admin.router)
-app.include_router(incomes.router)
+
+# Pequeño debug para ver rutas en producción si hace falta
+@app.get("/debug/routes")
+def list_routes():
+    return sorted([getattr(r, "path", "") for r in app.router.routes])
