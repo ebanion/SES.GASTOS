@@ -23,24 +23,32 @@ def require_internal_key(
 
 @router.post("", response_model=schemas.ExpenseOut, dependencies=[Depends(require_internal_key)])
 def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
-    apt = db.query(models.Apartment).filter(models.Apartment.id == payload.apartment_id).first()
+    # forzamos str porque en BD apartment_id es VARCHAR(36)
+    apt_id = str(payload.apartment_id)
+
+    apt = db.query(models.Apartment).filter(models.Apartment.id == apt_id).first()
     if not apt:
         raise HTTPException(status_code=404, detail="apartment_not_found")
 
     e = models.Expense(
-        apartment_id=payload.apartment_id,
+        apartment_id=apt_id,
         date=payload.date,
-        amount_gross=payload.amount_gross,   # ⬅️ ahora coincide con la BD y el modelo
+        amount_gross=payload.amount_gross,   # <-- ahora coincide con el modelo/BD
         currency=payload.currency,
         category=payload.category,
         description=payload.description,
         vendor=payload.vendor,
         invoice_number=payload.invoice_number,
         source=payload.source,
-        vat_rate=payload.vat_rate,
-        file_url=payload.file_url,
-        status=payload.status,
     )
+
+    # opcionales si existen en la BD (no pasa nada si el modelo no los tiene)
+    if hasattr(models.Expense, "vat_rate") and payload.vat_rate is not None:
+        e.vat_rate = payload.vat_rate
+    if hasattr(models.Expense, "file_url") and payload.file_url is not None:
+        e.file_url = payload.file_url
+    if hasattr(models.Expense, "status") and payload.status is not None:
+        e.status = payload.status
 
     db.add(e)
     db.commit()
@@ -50,16 +58,16 @@ def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
         id=e.id,
         apartment_id=e.apartment_id,
         date=e.date,
-        amount_gross=e.amount_gross,  # ⬅️ devolvemos el mismo nombre del schema
+        amount_gross=e.amount_gross,
         currency=e.currency,
         category=e.category,
         description=e.description,
         vendor=e.vendor,
         invoice_number=e.invoice_number,
         source=e.source,
-        vat_rate=e.vat_rate,
-        file_url=e.file_url,
-        status=e.status,
+        vat_rate=getattr(e, "vat_rate", None),
+        file_url=getattr(e, "file_url", None),
+        status=getattr(e, "status", None),
     )
 
 
@@ -70,7 +78,7 @@ def list_expenses(
 ):
     q = db.query(models.Expense)
     if apartment_id:
-        q = q.filter(models.Expense.apartment_id == apartment_id)
+        q = q.filter(models.Expense.apartment_id == str(apartment_id))
 
     rows = q.order_by(models.Expense.date.desc()).limit(200).all()
 
@@ -79,16 +87,16 @@ def list_expenses(
             id=r.id,
             apartment_id=r.apartment_id,
             date=r.date,
-            amount_gross=r.amount_gross,   # ⬅️ importante
+            amount_gross=r.amount_gross,
             currency=r.currency,
             category=r.category,
             description=r.description,
             vendor=r.vendor,
             invoice_number=r.invoice_number,
             source=r.source,
-            vat_rate=r.vat_rate,
-            file_url=r.file_url,
-            status=r.status,
+            vat_rate=getattr(r, "vat_rate", None),
+            file_url=getattr(r, "file_url", None),
+            status=getattr(r, "status", None),
         )
         for r in rows
     ]
