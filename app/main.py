@@ -7,7 +7,7 @@ from . import models  # noqa: F401
 from .db import Base, engine
 
 # routers
-from .routers import reservations, expenses, apartments, admin
+from .routers import reservations, expenses, apartments, admin, incomes
 
 app = FastAPI(title="SES.GASTOS")
 
@@ -32,3 +32,4 @@ app.include_router(reservations.router)
 app.include_router(expenses.router)
 app.include_router(apartments.router)
 app.include_router(admin.router)
+app.include_router(incomes.router)

@@ -87,3 +87,32 @@ class ExpenseOut(BaseModel):
     file_url: Optional[str] = None
     status: Optional[str] = None
 
+# ---------- INGRESOS ----------
+from typing import Literal
+from pydantic import BaseModel, Field
+from datetime import date, datetime
+from uuid import UUID
+from decimal import Decimal
+
+class IncomeFromReservationIn(BaseModel):
+    reservation_id: UUID
+    amount_gross: Decimal = Field(gt=0)
+    currency: str = "EUR"
+    # días de cancelación gratuita (si 5 => no reembolsable 5 días antes de check_in)
+    non_refundable_days: int = 5
+    # opcional por ahora (a futuro se puede guardar apartment_id dentro de Reservation)
+    apartment_id: str | None = None
+    source: str | None = "reservation"
+
+class IncomeOut(BaseModel):
+    id: UUID
+    reservation_id: UUID | None = None
+    apartment_id: str | None = None
+    date: date
+    amount_gross: Decimal
+    currency: str
+    status: Literal["PENDING", "CONFIRMED", "CANCELLED"]
+    non_refundable_at: date | None = None
+    source: str | None = None
+    created_at: datetime | None = None
+

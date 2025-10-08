@@ -88,4 +88,39 @@ class Expense(Base):
 
     apartment = relationship("Apartment", back_populates="expenses")
 
+# ---------- INGRESOS ----------
+import uuid
+from datetime import datetime, timezone
+from sqlalchemy import Column, String, Date, DateTime, Numeric, ForeignKey, func
+from sqlalchemy.dialects.postgresql import UUID
+
+class Income(Base):
+    __tablename__ = "incomes"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Relación con reservas (UUID) y con apartments (String(36))
+    reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=True)
+    apartment_id   = Column(String(36), ForeignKey("apartments.id"), nullable=True)
+
+    # Fecha de devengo del ingreso (normalmente el check_in)
+    date = Column(Date, nullable=False)
+
+    # Importe
+    amount_gross = Column(Numeric(12, 2), nullable=False)
+    currency     = Column(String(3), nullable=False, default="EUR")
+
+    # Estado y lógica de cancelación / no reembolso
+    status             = Column(String(20), nullable=False, default="PENDING")  # PENDING | CONFIRMED | CANCELLED
+    non_refundable_at  = Column(Date, nullable=True)
+
+    source = Column(String(50))  # "reservation", "manual", etc.
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
