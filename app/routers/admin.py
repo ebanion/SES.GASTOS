@@ -36,7 +36,7 @@ def init(
 ):
     _require_admin(key, x_internal_key)
     from ..db import Base
-    from .. import models  # noqa: F401  (importa modelos para que SQLAlchemy conozca las tablas)
+    from .. import models  # noqa: F401
     Base.metadata.create_all(bind=engine)
     insp = inspect(engine)
     return {"ok": True, "tables": sorted(insp.get_table_names())}
@@ -125,22 +125,16 @@ def migrate(
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status varchar(20)")
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS created_at timestamp with time zone")
 
-        # FK limpia y consistente
+        # FK limpia
         try_exec(conn, "ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_apartment_id_fkey")
         try_exec(conn, "ALTER TABLE expenses ADD CONSTRAINT expenses_apartment_id_fkey FOREIGN KEY (apartment_id) REFERENCES apartments(id) ON DELETE CASCADE")
 
-        # ---------- RESERVATIONS (NUEVO) ----------
-        # Alinea el tipo de id a varchar(36) (evita el error 'uuid vs character varying')
+        # ---------- RESERVATIONS ----------
         try_exec(conn, "ALTER TABLE reservations ALTER COLUMN id TYPE varchar(36) USING id::text")
-
-        # Añade apartment_id si no existe
         try_exec(conn, "ALTER TABLE reservations ADD COLUMN IF NOT EXISTS apartment_id varchar(36)")
-
-        # FK -> apartments (si existe vieja, la quitamos primero)
         try_exec(conn, "ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_apartment_id_fkey")
         try_exec(conn, "ALTER TABLE reservations ADD CONSTRAINT reservations_apartment_id_fkey FOREIGN KEY (apartment_id) REFERENCES apartments(id) ON DELETE SET NULL")
 
-    # Inspecciones para devolver en la respuesta
     with engine.begin() as conn:
         cols_exp = conn.execute(
             text("""
@@ -173,4 +167,36 @@ def migrate(
             for r in cols_res
         },
     }
+
+# ---------- SQL arbitrario seguro ----------
+@router.post("/sql")
+def exec_sql(
+    body: str,
+    key: str | None = None,
+    x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
+):
+    """
+    Ejecuta SQL arbitrario (solo ADMIN_KEY).
+    Ejemplo:
+      curl -X POST "https://ses-gastos.onrender.com/admin/sql?key=Jajeji29." \
+           -H "Content-Type: text/plain" \
+           -d "ALTER TABLE test ADD COLUMN demo text;"
+    """
+    _require_admin(key, x_internal_key)
+    executed, errors = [], []
+    from sqlalchemy import text as sql_text
+
+    with engine.begin() as conn:
+        for stmt in filter(None, body.split(";")):
+            sql = stmt.strip()
+            if not sql:
+                continue
+            try:
+                conn.execute(sql_text(sql))
+                executed.append(sql)
+            except Exception as e:
+                errors.append(f"{sql} -- {e}")
+
+    return {"ok": True, "executed": executed, "errors": errors}
+
 
