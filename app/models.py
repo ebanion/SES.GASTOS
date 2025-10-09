@@ -11,6 +11,11 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from .db import Base
 
+from sqlalchemy import Column, String, Date, DateTime, Numeric, ForeignKey, func
+from sqlalchemy.dialects.postgresql import UUID as PGUUID  # solo para 'id'
+import uuid
+from datetime import datetime, timezone
+
 # ---------- RESERVAS ----------
 class Reservation(Base):
     __tablename__ = "reservations"
@@ -94,10 +99,7 @@ class Expense(Base):
 
 # ---------- INGRESOS ----------
 
-from sqlalchemy import Column, String, Date, DateTime, Numeric, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID as PGUUID  # solo para 'id'
-import uuid
-from datetime import datetime, timezone
+
 
 class Income(Base):
     __tablename__ = "incomes"
