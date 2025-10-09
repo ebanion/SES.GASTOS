@@ -169,34 +169,61 @@ def migrate(
     }
 
 # ---------- SQL arbitrario seguro ----------
+from fastapi import Body, Request
+
 @router.post("/sql")
-def exec_sql(
-    body: str,
+async def exec_sql(
+    request: Request,
     key: str | None = None,
     x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
+    # Acepta texto plano directamente...
+    body_text: str | None = Body(default=None, media_type="text/plain"),
+    # ...o JSON: { "sql": "..." }
+    sql_json: str | None = Body(default=None, embed=True)
 ):
     """
     Ejecuta SQL arbitrario (solo ADMIN_KEY).
-    Ejemplo:
-      curl -X POST "https://ses-gastos.onrender.com/admin/sql?key=Jajeji29." \
+
+    Formatos aceptados:
+      - text/plain con el SQL directamente en el body
+      - application/json con {"sql": "<tu SQL...>"}
+
+    Ejemplos:
+
+      # text/plain
+      curl -X POST "https://ses-gastos.onrender.com/admin/sql?key=XXXX" \
            -H "Content-Type: text/plain" \
-           -d "ALTER TABLE test ADD COLUMN demo text;"
+           --data-binary $'ALTER TABLE ...;\\nALTER TABLE ...;'
+
+      # JSON
+      curl -X POST "https://ses-gastos.onrender.com/admin/sql?key=XXXX" \
+           -H "Content-Type: application/json" \
+           -d '{"sql":"ALTER TABLE ...; ALTER TABLE ...;"}'
     """
     _require_admin(key, x_internal_key)
-    executed, errors = [], []
-    from sqlalchemy import text as sql_text
 
+    # Detecta de dónde viene el SQL
+    raw = sql_json or body_text
+    if raw is None or not raw.strip():
+        # último intento: leer el cuerpo tal cual
+        raw_bytes = await request.body()
+        raw = raw_bytes.decode("utf-8").strip()
+
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty SQL")
+
+    # Partir por ';' conservando solo sentencias no vacías
+    stmts = [s.strip() for s in raw.split(";") if s.strip()]
+    executed, errors = [], []
+
+    from sqlalchemy import text as sql_text
     with engine.begin() as conn:
-        for stmt in filter(None, body.split(";")):
-            sql = stmt.strip()
-            if not sql:
-                continue
+        for s in stmts:
             try:
-                conn.execute(sql_text(sql))
-                executed.append(sql)
+                conn.execute(sql_text(s))
+                executed.append(s)
             except Exception as e:
-                errors.append(f"{sql} -- {e}")
+                errors.append(f"{s} -- {e}")
 
     return {"ok": True, "executed": executed, "errors": errors}
-
 
