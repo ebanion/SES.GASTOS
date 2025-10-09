@@ -3,22 +3,21 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+
 from sqlalchemy import (
     Column, String, Integer, Date, DateTime, Boolean,
     ForeignKey, Numeric, JSON, func
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
-from .db import Base
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
-from sqlalchemy import Column, String, Date, DateTime, Numeric, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID as PGUUID  # solo para 'id'
-import uuid
-from datetime import datetime, timezone
+from .db import Base
 
 # ---------- RESERVAS ----------
 class Reservation(Base):
     __tablename__ = "reservations"
+
+    # VARCHAR(36) alineado con migraciones
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     check_in   = Column(Date, nullable=False)
     check_out  = Column(Date, nullable=False)
@@ -26,7 +25,8 @@ class Reservation(Base):
     channel    = Column(String(50))
     email_contact = Column(String(255))
     phone_contact = Column(String(50))
-    # NUEVO:
+
+    # Puede ser nulo (no siempre se asigna al crear)
     apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=True)
 
     created_at = Column(
@@ -52,7 +52,7 @@ class IdempotencyKey(Base):
 # ---------- APARTAMENTOS ----------
 class Apartment(Base):
     __tablename__ = "apartments"
-    # Apartments como String(36), tal y como ya migraste
+
     id   = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     code = Column(String(64), unique=True, nullable=False)
     name = Column(String(255))
@@ -70,14 +70,16 @@ class Apartment(Base):
 # ---------- GASTOS ----------
 class Expense(Base):
     __tablename__ = "expenses"
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=False)
     date         = Column(Date, nullable=False)
+
+    # En BD la columna es amount_gross (numeric(12,2))
     amount_gross = Column(Numeric(12, 2), nullable=False)
     currency     = Column(String(3), nullable=False, default="EUR")
 
-    category       = Column(String(50))
+    category       = Column(String(50))         # nullable en código; BD puede exigirlo
     description    = Column(String(500))
     vendor         = Column(String(255))
     invoice_number = Column(String(128), nullable=True)
@@ -98,16 +100,16 @@ class Expense(Base):
     apartment = relationship("Apartment", back_populates="expenses")
 
 # ---------- INGRESOS ----------
-
-
-
 class Income(Base):
     __tablename__ = "incomes"
-    # La columna 'id' puede seguir siendo UUID (en DB es uuid):
+
+    # PK UUID (se queda como uuid en BD)
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # Alineado con DB: ambas varchar(36)
+    # Alineado con reservations.id (varchar(36))
     reservation_id = Column(String(36), ForeignKey("reservations.id"), nullable=True)
+
+    # Alineado con apartments.id (varchar(36))
     apartment_id   = Column(String(36), ForeignKey("apartments.id"),   nullable=True)
 
     date = Column(Date, nullable=False)
@@ -117,8 +119,7 @@ class Income(Base):
 
     status            = Column(String(20), nullable=False, default="PENDING")  # PENDING | CONFIRMED | CANCELLED
     non_refundable_at = Column(Date, nullable=True)
-
-    source = Column(String(50))
+    source            = Column(String(50))
 
     created_at = Column(
         DateTime(timezone=True),
@@ -127,4 +128,5 @@ class Income(Base):
         server_default=func.now(),
     )
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
