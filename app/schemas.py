@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 from decimal import Decimal
-from typing import Optional, Literal
+from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -16,14 +16,10 @@ class ReservationIn(BaseModel):
     channel: str = "manual"
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
-
-
-class ReservationOut(BaseModel):
-    reservation_id: UUID
-
+    # NUEVO:
+    apartment_id: Optional[str] = None  # String(36)
 
 class ReservationSyncIn(BaseModel):
-    """Usado por /api/v1/reservations/sync cuando POLICÍA ya generó el UUID."""
     booking_id: UUID
     check_in: date
     check_out: date
@@ -31,7 +27,8 @@ class ReservationSyncIn(BaseModel):
     channel: str = "manual"
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
-
+    # NUEVO:
+    apartment_id: Optional[str] = None
 
 # ---------- APARTAMENTOS ----------
 class ApartmentCreate(BaseModel):

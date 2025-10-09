@@ -93,20 +93,27 @@ class Expense(Base):
     apartment = relationship("Apartment", back_populates="expenses")
 
 # ---------- INGRESOS ----------
+
+from sqlalchemy import Column, String, Date, DateTime, Numeric, ForeignKey, func
+from sqlalchemy.dialects.postgresql import UUID as PGUUID  # solo para 'id'
+import uuid
+from datetime import datetime, timezone
+
 class Income(Base):
     __tablename__ = "incomes"
+    # La columna 'id' puede seguir siendo UUID (en DB es uuid):
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
-    # FK: reservations → UUID, apartments → String(36)
-    reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=True)
-    apartment_id   = Column(String(36), ForeignKey("apartments.id"), nullable=True)
+    # Alineado con DB: ambas varchar(36)
+    reservation_id = Column(String(36), ForeignKey("reservations.id"), nullable=True)
+    apartment_id   = Column(String(36), ForeignKey("apartments.id"),   nullable=True)
 
     date = Column(Date, nullable=False)
+
     amount_gross = Column(Numeric(12, 2), nullable=False)
     currency     = Column(String(3), nullable=False, default="EUR")
 
-    status            = Column(String(20), nullable=False, default="PENDING")  # PENDING|CONFIRMED|CANCELLED
+    status            = Column(String(20), nullable=False, default="PENDING")  # PENDING | CONFIRMED | CANCELLED
     non_refundable_at = Column(Date, nullable=True)
 
     source = Column(String(50))
@@ -118,6 +125,4 @@ class Income(Base):
         server_default=func.now(),
     )
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-
 

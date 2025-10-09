@@ -1,8 +1,9 @@
 # app/routers/incomes.py
 from __future__ import annotations
 
-import os
-from datetime import date, timedelta
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -11,135 +12,130 @@ from .. import models, schemas
 
 router = APIRouter(prefix="/api/v1/incomes", tags=["incomes"])
 
+
 def require_internal_key(
-    x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
-    key: str | None = Query(default=None),
+    x_internal_key: Optional[str] = Header(default=None, alias="X-Internal-Key"),
+    key: Optional[str] = Query(default=None),
 ):
+    import os
     admin = os.getenv("ADMIN_KEY", "")
     provided = x_internal_key or key
     if not admin or provided != admin:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
-@router.post("/from_reservation",
-             response_model=schemas.IncomeOut,
+def _to_out(row: models.Income) -> schemas.IncomeOut:
+    return schemas.IncomeOut(
+        id=str(row.id),
+        reservation_id=str(row.reservation_id) if row.reservation_id else None,
+        apartment_id=row.apartment_id,
+        date=row.date,
+        amount_gross=row.amount_gross,
+        currency=row.currency,
+        status=row.status,
+        non_refundable_at=row.non_refundable_at,
+        source=row.source,
+        created_at=row.created_at,
+    )
+
+
+@router.get("", response_model=list[schemas.IncomeOut])
+def list_incomes(
+    reservation_id: Optional[str] = Query(default=None),
+    apartment_id: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),  # PENDING | CONFIRMED | CANCELLED
+    db: Session = Depends(get_db),
+):
+    q = db.query(models.Income)
+
+    if reservation_id:
+        q = q.filter(models.Income.reservation_id == reservation_id)
+
+    if apartment_id:
+        q = q.filter(models.Income.apartment_id == apartment_id)
+
+    if status:
+        q = q.filter(models.Income.status == status)
+
+    rows = q.order_by(models.Income.created_at.desc()).limit(200).all()
+    return [_to_out(r) for r in rows]
+
+
+@router.post("/from_reservation", response_model=schemas.IncomeOut,
              dependencies=[Depends(require_internal_key)])
 def create_income_from_reservation(
     payload: schemas.IncomeFromReservationIn,
     db: Session = Depends(get_db),
 ):
-    # 1) Localiza la reserva
-    r = db.query(models.Reservation).filter(models.Reservation.id == payload.reservation_id).first()
+    # 1) Buscar la reserva
+    r = db.query(models.Reservation).filter(
+        models.Reservation.id == payload.reservation_id
+    ).first()
     if not r:
         raise HTTPException(status_code=404, detail="reservation_not_found")
 
-    # 2) Calcula fecha no reembolsable y estado inicial
-    non_ref_at = None
-    status = "CONFIRMED"
-    if payload.non_refundable_days and payload.non_refundable_days > 0:
-        non_ref_at = r.check_in - timedelta(days=payload.non_refundable_days)
-        status = "PENDING" if date.today() < non_ref_at else "CONFIRMED"
+    # Fecha base del ingreso = check_in
+    income_date = r.check_in
+
+    # no reembolsable en check_in - policy_days
+    non_refundable_at = r.check_in - timedelta(days=payload.policy_days or 0)
+
+    # Confirmado si ya pasamos la fecha de no reembolso
+    today = datetime.now(timezone.utc).date()
+    status = "CONFIRMED" if today >= non_refundable_at else "PENDING"
 
     inc = models.Income(
-        reservation_id=r.id,
-        apartment_id=payload.apartment_id,  # puede ir a None si aún no lo sabemos
-        date=r.check_in,
+        reservation_id=str(r.id),
+        apartment_id=payload.apartment_id or getattr(r, "apartment_id", None),
+        date=income_date,
         amount_gross=payload.amount_gross,
         currency=payload.currency,
         status=status,
-        non_refundable_at=non_ref_at,
+        non_refundable_at=non_refundable_at,
         source=payload.source or "reservation",
     )
-    db.add(inc); db.commit(); db.refresh(inc)
+    db.add(inc)
+    db.commit()
+    db.refresh(inc)
 
-    return schemas.IncomeOut(
-        id=inc.id,
-        reservation_id=inc.reservation_id,
-        apartment_id=inc.apartment_id,
-        date=inc.date,
-        amount_gross=inc.amount_gross,
-        currency=inc.currency,
-        status=inc.status,
-        non_refundable_at=inc.non_refundable_at,
-        source=inc.source,
-        created_at=inc.created_at,
-    )
+    return _to_out(inc)
 
 
-@router.post("/{income_id}/cancel",
-             response_model=schemas.IncomeOut,
+@router.post("/{income_id}/cancel", response_model=schemas.IncomeOut,
              dependencies=[Depends(require_internal_key)])
-def cancel_income(income_id: str, db: Session = Depends(get_db)):
+def cancel_income(
+    income_id: str,
+    db: Session = Depends(get_db),
+):
     inc = db.query(models.Income).filter(models.Income.id == income_id).first()
     if not inc:
         raise HTTPException(status_code=404, detail="income_not_found")
 
+    if inc.status == "CONFIRMED":
+        # política: no permitir cancelar ingresos ya confirmados
+        raise HTTPException(status_code=409, detail="income_already_confirmed")
+
     inc.status = "CANCELLED"
-    db.commit(); db.refresh(inc)
-
-    return schemas.IncomeOut(
-        id=inc.id,
-        reservation_id=inc.reservation_id,
-        apartment_id=inc.apartment_id,
-        date=inc.date,
-        amount_gross=inc.amount_gross,
-        currency=inc.currency,
-        status=inc.status,
-        non_refundable_at=inc.non_refundable_at,
-        source=inc.source,
-        created_at=inc.created_at,
-    )
+    db.commit()
+    db.refresh(inc)
+    return _to_out(inc)
 
 
-@router.post("/roll",
-             dependencies=[Depends(require_internal_key)])
-def roll_pending_incomes(db: Session = Depends(get_db)):
-    """Confirma todos los ingresos PENDING cuya fecha no reembolsable ya pasó."""
-    today = date.today()
+@router.post("/roll", dependencies=[Depends(require_internal_key)])
+def roll_confirm_incomes(db: Session = Depends(get_db)):
+    """
+    Confirma (status = CONFIRMED) todos los ingresos PENDING cuya
+    fecha 'non_refundable_at' sea <= hoy.
+    """
+    today = datetime.now(timezone.utc).date()
     q = db.query(models.Income).filter(
         models.Income.status == "PENDING",
-        models.Income.non_refundable_at.isnot(None),
         models.Income.non_refundable_at <= today,
     )
-    count = 0
-    for inc in q.all():
+    rows = q.all()
+    for inc in rows:
         inc.status = "CONFIRMED"
-        count += 1
-    if count:
-        db.commit()
-    return {"ok": True, "confirmed": count}
+    db.commit()
 
+    return {"ok": True, "confirmed": len(rows)}
 
-@router.get("",
-            response_model=list[schemas.IncomeOut])
-def list_incomes(
-    reservation_id: str | None = None,
-    apartment_id: str | None = None,
-    status: str | None = None,
-    db: Session = Depends(get_db),
-):
-    q = db.query(models.Income)
-    if reservation_id:
-        q = q.filter(models.Income.reservation_id == reservation_id)
-    if apartment_id:
-        q = q.filter(models.Income.apartment_id == apartment_id)
-    if status:
-        q = q.filter(models.Income.status == status)
-
-    rows = q.order_by(models.Income.date.desc()).limit(200).all()
-
-    return [
-        schemas.IncomeOut(
-            id=r.id,
-            reservation_id=r.reservation_id,
-            apartment_id=r.apartment_id,
-            date=r.date,
-            amount_gross=r.amount_gross,
-            currency=r.currency,
-            status=r.status,
-            non_refundable_at=r.non_refundable_at,
-            source=r.source,
-            created_at=r.created_at,
-        )
-        for r in rows
-    ]
