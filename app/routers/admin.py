@@ -123,36 +123,52 @@ def migrate(
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS vat_rate integer")
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS file_url text")
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status varchar(20)")
+        # usa timestamptz para uniformidad (idempotente si ya existe)
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS created_at timestamp with time zone")
+        try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone")
 
-        # FK limpia
+        # FK limpia y consistente
         try_exec(conn, "ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_apartment_id_fkey")
         try_exec(conn, "ALTER TABLE expenses ADD CONSTRAINT expenses_apartment_id_fkey FOREIGN KEY (apartment_id) REFERENCES apartments(id) ON DELETE CASCADE")
 
-        # ---------- RESERVATIONS ----------
+        # ---------- RESERVATIONS + INCOMES (FIX DURO) ----------
+        # 1) soltar FK que bloquea el cambio de tipo en reservations.id
+        try_exec(conn, "ALTER TABLE incomes DROP CONSTRAINT IF EXISTS incomes_reservation_id_fkey")
+
+        # 2) cambiar tipos a varchar(36)
         try_exec(conn, "ALTER TABLE reservations ALTER COLUMN id TYPE varchar(36) USING id::text")
+        try_exec(conn, "ALTER TABLE incomes ALTER COLUMN reservation_id TYPE varchar(36) USING reservation_id::text")
+
+        # 3) añadir apartment_id en reservations + FK
         try_exec(conn, "ALTER TABLE reservations ADD COLUMN IF NOT EXISTS apartment_id varchar(36)")
         try_exec(conn, "ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_apartment_id_fkey")
         try_exec(conn, "ALTER TABLE reservations ADD CONSTRAINT reservations_apartment_id_fkey FOREIGN KEY (apartment_id) REFERENCES apartments(id) ON DELETE SET NULL")
 
-    with engine.begin() as conn:
-        cols_exp = conn.execute(
-            text("""
-                SELECT column_name, is_nullable, data_type
-                FROM information_schema.columns
-                WHERE table_name='expenses'
-                ORDER BY ordinal_position
-            """)
-        ).mappings().all()
+        # 4) re-crear FK incomes -> reservations
+        try_exec(conn, "ALTER TABLE incomes ADD CONSTRAINT incomes_reservation_id_fkey FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE")
 
-        cols_res = conn.execute(
-            text("""
-                SELECT column_name, is_nullable, data_type
-                FROM information_schema.columns
-                WHERE table_name='reservations'
-                ORDER BY ordinal_position
-            """)
-        ).mappings().all()
+    # Inspecciones
+    with engine.begin() as conn:
+        cols_exp = conn.execute(text("""
+            SELECT column_name, is_nullable, data_type
+            FROM information_schema.columns
+            WHERE table_name='expenses'
+            ORDER BY ordinal_position
+        """)).mappings().all()
+
+        cols_res = conn.execute(text("""
+            SELECT column_name, is_nullable, data_type
+            FROM information_schema.columns
+            WHERE table_name='reservations'
+            ORDER BY ordinal_position
+        """)).mappings().all()
+
+        cols_inc = conn.execute(text("""
+            SELECT column_name, is_nullable, data_type
+            FROM information_schema.columns
+            WHERE table_name='incomes'
+            ORDER BY ordinal_position
+        """)).mappings().all()
 
     return {
         "ok": True,
@@ -166,10 +182,14 @@ def migrate(
             r["column_name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]}
             for r in cols_res
         },
+        "incomes_columns": {
+            r["column_name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]}
+            for r in cols_inc
+        },
     }
 
 # ---------- SQL arbitrario seguro ----------
-# ---------- SQL arbitrario seguro ----------
+
 from fastapi import Body, Request
 
 @router.post("/sql")
