@@ -169,50 +169,52 @@ def migrate(
     }
 
 # ---------- SQL arbitrario seguro ----------
+# ---------- SQL arbitrario seguro ----------
 from fastapi import Body, Request
 
 @router.post("/sql")
 async def exec_sql(
     request: Request,
-    key: str | None = None,
+    key: str | None = Query(default=None),
     x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
-    # Acepta texto plano directamente...
     body_text: str | None = Body(default=None, media_type="text/plain"),
-    # ...o JSON: { "sql": "..." }
-    sql_json: str | None = Body(default=None, embed=True)
 ):
     """
     Ejecuta SQL arbitrario (solo ADMIN_KEY).
 
-    Formatos aceptados:
-      - text/plain con el SQL directamente en el body
-      - application/json con {"sql": "<tu SQL...>"}
+    Acepta:
+      - text/plain -> el SQL directo en el cuerpo
+      - application/json -> {"sql": "sentencias; separadas; por; ;"}
 
-    Ejemplos:
-
-      # text/plain
-      curl -X POST "https://ses-gastos.onrender.com/admin/sql?key=XXXX" \
-           -H "Content-Type: text/plain" \
-           --data-binary $'ALTER TABLE ...;\\nALTER TABLE ...;'
-
-      # JSON
-      curl -X POST "https://ses-gastos.onrender.com/admin/sql?key=XXXX" \
-           -H "Content-Type: application/json" \
-           -d '{"sql":"ALTER TABLE ...; ALTER TABLE ...;"}'
+    Si envías JSON con ConvertTo-Json en PowerShell, aquí lo parseamos.
     """
     _require_admin(key, x_internal_key)
 
-    # Detecta de dónde viene el SQL
-    raw = sql_json or body_text
-    if raw is None or not raw.strip():
-        # último intento: leer el cuerpo tal cual
-        raw_bytes = await request.body()
-        raw = raw_bytes.decode("utf-8").strip()
+    raw = None
 
+    # 1) Si viene como JSON, intenta extraer el campo "sql"
+    try:
+        if "application/json" in (request.headers.get("content-type") or "").lower():
+            data = await request.json()
+            if isinstance(data, dict) and isinstance(data.get("sql"), str):
+                raw = data["sql"]
+    except Exception:
+        pass
+
+    # 2) Si no, usa texto plano si llegó algo
+    if raw is None and body_text:
+        raw = body_text
+
+    # 3) Último recurso: leer cuerpo bruto
+    if raw is None:
+        raw_bytes = await request.body()
+        raw = raw_bytes.decode("utf-8", errors="ignore")
+
+    raw = (raw or "").strip()
     if not raw:
         raise HTTPException(status_code=400, detail="Empty SQL")
 
-    # Partir por ';' conservando solo sentencias no vacías
+    # Separar por ';'
     stmts = [s.strip() for s in raw.split(";") if s.strip()]
     executed, errors = [], []
 
@@ -226,4 +228,3 @@ async def exec_sql(
                 errors.append(f"{s} -- {e}")
 
     return {"ok": True, "executed": executed, "errors": errors}
-
