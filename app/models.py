@@ -14,15 +14,16 @@ from .db import Base
 # ---------- RESERVAS ----------
 class Reservation(Base):
     __tablename__ = "reservations"
-    # UUID real (coincide con la BD)
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     check_in   = Column(Date, nullable=False)
     check_out  = Column(Date, nullable=False)
     guests     = Column(Integer, nullable=False)
     channel    = Column(String(50))
     email_contact = Column(String(255))
     phone_contact = Column(String(50))
+    # NUEVO:
+    apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=True)
+
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -117,5 +118,6 @@ class Income(Base):
         server_default=func.now(),
     )
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 

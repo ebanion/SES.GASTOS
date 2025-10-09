@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+﻿# app/routers/admin.py
+from __future__ import annotations
 import os
 from fastapi import APIRouter, HTTPException, Header, Query
 from sqlalchemy import text, inspect
@@ -20,22 +21,32 @@ def health():
     return {"ok": True}
 
 @router.get("/db-ping")
-def db_ping(key: str | None = None, x_internal_key: str | None = Header(default=None, alias="X-Internal-Key")):
+def db_ping(
+    key: str | None = None,
+    x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
+):
     _require_admin(key, x_internal_key)
     insp = inspect(engine)
     return {"ok": True, "tables": sorted(insp.get_table_names())}
 
 @router.post("/init")
-def init(key: str | None = None, x_internal_key: str | None = Header(default=None, alias="X-Internal-Key")):
+def init(
+    key: str | None = None,
+    x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
+):
     _require_admin(key, x_internal_key)
     from ..db import Base
-    from .. import models  # noqa
+    from .. import models  # noqa: F401  (importa modelos para que SQLAlchemy conozca las tablas)
     Base.metadata.create_all(bind=engine)
     insp = inspect(engine)
     return {"ok": True, "tables": sorted(insp.get_table_names())}
 
 @router.get("/describe/{table}")
-def describe(table: str, key: str | None = None, x_internal_key: str | None = Header(default=None, alias="X-Internal-Key")):
+def describe(
+    table: str,
+    key: str | None = None,
+    x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
+):
     _require_admin(key, x_internal_key)
     sql = """
     SELECT column_name AS name, is_nullable, data_type
@@ -48,11 +59,17 @@ def describe(table: str, key: str | None = None, x_internal_key: str | None = He
     return {
         "ok": True,
         "table": table,
-        "columns": {r["name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]} for r in rows},
+        "columns": {
+            r["name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]}
+            for r in rows
+        },
     }
 
 @router.post("/migrate")
-def migrate(key: str | None = None, x_internal_key: str | None = Header(default=None, alias="X-Internal-Key")):
+def migrate(
+    key: str | None = None,
+    x_internal_key: str | None = Header(default=None, alias="X-Internal-Key"),
+):
     _require_admin(key, x_internal_key)
 
     executed: list[str] = []
@@ -75,15 +92,14 @@ def migrate(key: str | None = None, x_internal_key: str | None = Header(default=
         return bool(r)
 
     with engine.begin() as conn:
-        # --- APARTMENTS: asegurar tipos y unicidad ---
+        # ---------- APARTMENTS ----------
         try_exec(conn, "ALTER TABLE apartments ALTER COLUMN id TYPE varchar(36) USING id::text")
         try_exec(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ux_apartments_code ON apartments (code)")
         try_exec(conn, "ALTER TABLE apartments ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true")
         try_exec(conn, "ALTER TABLE apartments ALTER COLUMN name DROP NOT NULL")
         try_exec(conn, "ALTER TABLE apartments DROP COLUMN IF EXISTS telegram_chat_id")
 
-        # --- EXPENSES: alinear con modelo/schemas ---
-        # tipos de id
+        # ---------- EXPENSES ----------
         try_exec(conn, "ALTER TABLE expenses ALTER COLUMN id TYPE varchar(36) USING id::text")
         try_exec(conn, "ALTER TABLE expenses ALTER COLUMN apartment_id TYPE varchar(36) USING apartment_id::text")
 
@@ -96,7 +112,7 @@ def migrate(key: str | None = None, x_internal_key: str | None = Header(default=
         if not has_amount_gross:
             try_exec(conn, "ALTER TABLE expenses ADD COLUMN amount_gross numeric(12,2)")
 
-        # columnas opcionales (NULLABLE)
+        # columnas opcionales
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS currency varchar(3)")
         try_exec(conn, "ALTER TABLE expenses ALTER COLUMN currency SET DEFAULT 'EUR'")
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS category varchar(50)")
@@ -107,25 +123,54 @@ def migrate(key: str | None = None, x_internal_key: str | None = Header(default=
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS vat_rate integer")
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS file_url text")
         try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status varchar(20)")
-        try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS created_at timestamp")
+        try_exec(conn, "ALTER TABLE expenses ADD COLUMN IF NOT EXISTS created_at timestamp with time zone")
 
         # FK limpia y consistente
         try_exec(conn, "ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_apartment_id_fkey")
         try_exec(conn, "ALTER TABLE expenses ADD CONSTRAINT expenses_apartment_id_fkey FOREIGN KEY (apartment_id) REFERENCES apartments(id) ON DELETE CASCADE")
 
-    # inspección rápida de expenses
+        # ---------- RESERVATIONS (NUEVO) ----------
+        # Alinea el tipo de id a varchar(36) (evita el error 'uuid vs character varying')
+        try_exec(conn, "ALTER TABLE reservations ALTER COLUMN id TYPE varchar(36) USING id::text")
+
+        # Añade apartment_id si no existe
+        try_exec(conn, "ALTER TABLE reservations ADD COLUMN IF NOT EXISTS apartment_id varchar(36)")
+
+        # FK -> apartments (si existe vieja, la quitamos primero)
+        try_exec(conn, "ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_apartment_id_fkey")
+        try_exec(conn, "ALTER TABLE reservations ADD CONSTRAINT reservations_apartment_id_fkey FOREIGN KEY (apartment_id) REFERENCES apartments(id) ON DELETE SET NULL")
+
+    # Inspecciones para devolver en la respuesta
     with engine.begin() as conn:
-        cols_exp = conn.execute(text("""
-            SELECT column_name, is_nullable, data_type
-            FROM information_schema.columns
-            WHERE table_name='expenses'
-            ORDER BY ordinal_position
-        """)).mappings().all()
+        cols_exp = conn.execute(
+            text("""
+                SELECT column_name, is_nullable, data_type
+                FROM information_schema.columns
+                WHERE table_name='expenses'
+                ORDER BY ordinal_position
+            """)
+        ).mappings().all()
+
+        cols_res = conn.execute(
+            text("""
+                SELECT column_name, is_nullable, data_type
+                FROM information_schema.columns
+                WHERE table_name='reservations'
+                ORDER BY ordinal_position
+            """)
+        ).mappings().all()
 
     return {
         "ok": True,
         "executed": executed,
         "errors": errors,
-        "expenses_columns": {r["column_name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]} for r in cols_exp},
+        "expenses_columns": {
+            r["column_name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]}
+            for r in cols_exp
+        },
+        "reservations_columns": {
+            r["column_name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]}
+            for r in cols_res
+        },
     }
 
