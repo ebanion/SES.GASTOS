@@ -69,6 +69,7 @@ def create_reservation(
             channel=payload.channel,
             email_contact=payload.email,
             phone_contact=payload.phone,
+	    apartment_id=payload.apartment_id,
         )
         db.add(r)
         db.commit()
@@ -150,6 +151,7 @@ def sync_reservation(
                 channel=payload.channel,
                 email_contact=payload.email,
                 phone_contact=payload.phone,
+                apartment_id=payload.apartment_id,
             )
             db.add(r)
         else:
@@ -159,6 +161,7 @@ def sync_reservation(
             r.channel = payload.channel
             r.email_contact = payload.email
             r.phone_contact = payload.phone
+            r.apartment_id = payload.apartment_id
 
         db.commit()
         db.refresh(r)

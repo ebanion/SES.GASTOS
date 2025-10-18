@@ -1,0 +1,71 @@
+*** a/app/models.py
+--- b/app/models.py
+@@
+ class Reservation(Base):
+     __tablename__ = "reservations"
+     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
++    # Nuevo: referencia opcional al apartamento asociado
++    apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=True)
+     check_in   = Column(Date, nullable=False)
+     check_out  = Column(Date, nullable=False)
+     guests     = Column(Integer, nullable=False)
+     channel    = Column(String(50))
+     email_contact = Column(String(255))
+     phone_contact = Column(String(50))
+     created_at = Column(
+         DateTime(timezone=True),
+         nullable=False,
+         default=lambda: datetime.now(timezone.utc),
+         server_default=func.now(),
+     )
+*** a/app/routers/admin.py
+--- b/app/routers/admin.py
+@@
+ def migrate(key: str | None = None, x_internal_key: str | None = Header(default=None, alias="X-Internal-Key")):
+     _require_admin(key, x_internal_key)
+ 
+     executed: list[str] = []
+     errors: list[str] = []
+@@
+     with engine.begin() as conn:
+         # --- APARTMENTS: asegurar tipos y unicidad ---
+         try_exec(conn, "ALTER TABLE apartments ALTER COLUMN id TYPE varchar(36) USING id::text")
+         try_exec(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ux_apartments_code ON apartments (code)")
+         try_exec(conn, "ALTER TABLE apartments ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true")
+         try_exec(conn, "ALTER TABLE apartments ALTER COLUMN name DROP NOT NULL")
+         try_exec(conn, "ALTER TABLE apartments DROP COLUMN IF EXISTS telegram_chat_id")
+ 
++        # --- RESERVATIONS: asegurar tipos y FK opcional a apartments ---
++        try_exec(conn, "ALTER TABLE reservations ALTER COLUMN id TYPE varchar(36) USING id::text")
++        try_exec(conn, "ALTER TABLE reservations ADD COLUMN IF NOT EXISTS apartment_id varchar(36)")
++        try_exec(conn, "ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_apartment_id_fkey")
++        try_exec(conn, "ALTER TABLE reservations ADD CONSTRAINT reservations_apartment_id_fkey FOREIGN KEY (apartment_id) REFERENCES apartments(id) ON DELETE SET NULL")
++
+         # --- EXPENSES: alinear con modelo/schemas ---
+         # tipos de id
+         try_exec(conn, "ALTER TABLE expenses ALTER COLUMN id TYPE varchar(36) USING id::text")
+         try_exec(conn, "ALTER TABLE expenses ALTER COLUMN apartment_id TYPE varchar(36) USING apartment_id::text")
+@@
+     # inspección rápida de expenses
+     with engine.begin() as conn:
+         cols_exp = conn.execute(text("""
+             SELECT column_name, is_nullable, data_type
+             FROM information_schema.columns
+             WHERE table_name='expenses'
+             ORDER BY ordinal_position
+         """)).mappings().all()
++        cols_res = conn.execute(text("""
++            SELECT column_name, is_nullable, data_type
++            FROM information_schema.columns
++            WHERE table_name='reservations'
++            ORDER BY ordinal_position
++        """)).mappings().all()
+ 
+     return {
+         "ok": True,
+         "executed": executed,
+         "errors": errors,
+-        "expenses_columns": {r["column_name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]} for r in cols_exp},
++        "expenses_columns": {r["column_name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]} for r in cols_exp},
++        "reservations_columns": {r["column_name"]: {"nullable": (r["is_nullable"] == "YES"), "type": r["data_type"]} for r in cols_res},
+     }

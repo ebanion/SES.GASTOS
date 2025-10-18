@@ -10,6 +10,14 @@ from .db import Base, engine
 # Routers
 from .routers import reservations, expenses, apartments, incomes, admin, incomes
 
+# Dashboard
+from .dashboard_api import router as dashboard_router
+
+# Vectors
+from .routers import vectors
+
+
+
 app = FastAPI(title="SES.GASTOS")
 
 # Crear/migrar tablas al arrancar
@@ -35,6 +43,8 @@ app.include_router(expenses.router)
 app.include_router(apartments.router)
 app.include_router(incomes.router)   # <= IMPORTANTE
 app.include_router(admin.router)
+app.include_router(dashboard_router)
+app.include_router(vectors.router)
 
 # Pequeño debug para ver rutas en producción si hace falta
 @app.get("/debug/routes")

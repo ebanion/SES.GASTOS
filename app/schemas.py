@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from pydantic import BaseModel, EmailStr, Field
 
 # ---------- RESERVAS ----------
@@ -98,3 +98,25 @@ class IncomeOut(BaseModel):
     non_refundable_at: Optional[date] = None
     source: Optional[str] = None
     created_at: Optional[datetime] = None
+
+# ---------- DASHBOARD ----------
+class ExpenseSummary(BaseModel):
+    category: str
+    total: float
+
+class DashboardMonthSummary(BaseModel):
+    month: int
+    incomes_accepted: float = 0.0
+    incomes_pending: float = 0.0
+    reservations_accepted: int = 0
+    reservations_pending: int = 0
+    expenses: float = 0.0
+    net: float = 0.0
+    # opcional: desglose por categorías si lo quieres usar en cards/gráficos
+    expenses_by_category: List[ExpenseSummary] = []
+
+class DashboardMonthlyResponse(BaseModel):
+    year: int
+    items: List[DashboardMonthSummary]
+
+
