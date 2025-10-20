@@ -1,0 +1,303 @@
+<!-- Dashboard Content Template (rendered by HTMX) -->
+<div class="fade-in">
+    <!-- Metrics Cards -->
+    <div class="metrics-grid">
+        <div class="card metric-card">
+            <div class="card-subtitle">Ingresos Totales</div>
+            <div class="metric-value" style="color: var(--success-color);" id="totalIncome">€0</div>
+            <div class="metric-change" id="incomeChange">
+                <span>📈</span>
+                <span>vs año anterior</span>
+            </div>
+        </div>
+        
+        <div class="card metric-card">
+            <div class="card-subtitle">Gastos Totales</div>
+            <div class="metric-value" style="color: var(--danger-color);" id="totalExpenses">€0</div>
+            <div class="metric-change" id="expenseChange">
+                <span>📊</span>
+                <span>vs año anterior</span>
+            </div>
+        </div>
+        
+        <div class="card metric-card">
+            <div class="card-subtitle">Beneficio Neto</div>
+            <div class="metric-value" style="color: var(--primary-color);" id="netProfit">€0</div>
+            <div class="metric-change" id="netChange">
+                <span>💰</span>
+                <span>vs año anterior</span>
+            </div>
+        </div>
+        
+        <div class="card metric-card">
+            <div class="card-subtitle">Margen de Beneficio</div>
+            <div class="metric-value" style="color: var(--warning-color);" id="profitMargin">0%</div>
+            <div class="metric-change neutral">
+                <span>📊</span>
+                <span>del total de ingresos</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="dashboard-grid">
+        <!-- Monthly Overview Chart -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <h3 class="card-title">📈 Evolución Mensual</h3>
+                <div class="control-group">
+                    <button class="btn btn-secondary" onclick="downloadChart('monthlyChart')">
+                        📥 Descargar
+                    </button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="monthlyChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Category Breakdown -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">🏷️ Gastos por Categoría</h3>
+            </div>
+            <div class="chart-container small">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📋 Actividad Reciente</h3>
+                <button class="btn btn-secondary" hx-get="/api/v1/dashboard/recent-expenses" hx-target="#recentExpenses">
+                    🔄
+                </button>
+            </div>
+            <div id="recentExpenses" hx-get="/api/v1/dashboard/recent-expenses" hx-trigger="load">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Cargando...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Details Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📅 Desglose Mensual Detallado</h3>
+            <div class="control-group">
+                <button class="btn btn-secondary" onclick="exportToExcel()">
+                    📊 Exportar Excel
+                </button>
+                <button class="btn btn-secondary" onclick="exportToPDF()">
+                    📄 Exportar PDF
+                </button>
+            </div>
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="data-table" id="monthlyTable">
+                <thead>
+                    <tr>
+                        <th>Mes</th>
+                        <th>Ingresos Confirmados</th>
+                        <th>Ingresos Pendientes</th>
+                        <th>Total Ingresos</th>
+                        <th>Gastos</th>
+                        <th>Beneficio Neto</th>
+                        <th>Margen %</th>
+                        <th>Reservas</th>
+                    </tr>
+                </thead>
+                <tbody id="monthlyTableBody">
+                    <!-- Populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// Dashboard data will be injected here
+let dashboardData = null;
+
+// Initialize dashboard with data
+function initializeDashboard(data) {
+    dashboardData = data;
+    
+    // Update metrics
+    updateMetrics();
+    
+    // Create charts
+    createMonthlyChart(data);
+    createCategoryChart(data);
+    
+    // Populate table
+    populateMonthlyTable(data);
+    
+    // Load recent expenses
+    loadRecentExpenses();
+}
+
+function updateMetrics() {
+    if (!dashboardData) return;
+    
+    // Get summary stats
+    const year = document.getElementById('yearSelect').value;
+    const apartment = document.getElementById('apartmentSelect').value;
+    
+    let url = `/api/v1/dashboard/summary-stats?year=${year}`;
+    if (apartment) {
+        url += `&apartment_code=${apartment}`;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(stats => {
+            // Update metric values
+            document.getElementById('totalIncome').textContent = formatCurrency(stats.total_income);
+            document.getElementById('totalExpenses').textContent = formatCurrency(stats.total_expenses);
+            document.getElementById('netProfit').textContent = formatCurrency(stats.net_profit);
+            document.getElementById('profitMargin').textContent = formatPercentage(stats.profit_margin);
+            
+            // Update change indicators
+            updateChangeIndicator('incomeChange', stats.income_change);
+            updateChangeIndicator('expenseChange', stats.expense_change);
+            updateChangeIndicator('netChange', stats.net_change);
+        })
+        .catch(error => console.error('Error loading stats:', error));
+}
+
+function updateChangeIndicator(elementId, change) {
+    const element = document.getElementById(elementId);
+    const changeSpan = element.querySelector('span:last-child');
+    
+    if (change > 0) {
+        element.className = 'metric-change positive';
+        changeSpan.textContent = `+${formatPercentage(change)} vs año anterior`;
+    } else if (change < 0) {
+        element.className = 'metric-change negative';
+        changeSpan.textContent = `${formatPercentage(change)} vs año anterior`;
+    } else {
+        element.className = 'metric-change neutral';
+        changeSpan.textContent = 'Sin cambios vs año anterior';
+    }
+}
+
+function populateMonthlyTable(data) {
+    const tbody = document.getElementById('monthlyTableBody');
+    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    
+    tbody.innerHTML = '';
+    
+    data.items.forEach((item, index) => {
+        const totalIncome = item.incomes_accepted + item.incomes_pending;
+        const margin = totalIncome > 0 ? (item.net / totalIncome) * 100 : 0;
+        const totalReservations = item.reservations_accepted + item.reservations_pending;
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${months[index]}</strong></td>
+            <td style="color: var(--success-color);">${formatCurrency(item.incomes_accepted)}</td>
+            <td style="color: var(--warning-color);">${formatCurrency(item.incomes_pending)}</td>
+            <td><strong>${formatCurrency(totalIncome)}</strong></td>
+            <td style="color: var(--danger-color);">${formatCurrency(item.expenses)}</td>
+            <td style="color: ${item.net >= 0 ? 'var(--success-color)' : 'var(--danger-color)'};">
+                <strong>${formatCurrency(item.net)}</strong>
+            </td>
+            <td>${formatPercentage(margin)}</td>
+            <td>
+                <span class="status-indicator status-success"></span>${item.reservations_accepted}
+                <span class="status-indicator status-warning"></span>${item.reservations_pending}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function loadRecentExpenses() {
+    const apartment = document.getElementById('apartmentSelect').value;
+    let url = '/api/v1/dashboard/recent-expenses?limit=10';
+    if (apartment) {
+        url += `&apartment_code=${apartment}`;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(expenses => {
+            const container = document.getElementById('recentExpenses');
+            
+            if (expenses.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No hay gastos recientes</p>';
+                return;
+            }
+            
+            const expensesList = expenses.map(exp => `
+                <div style="padding: 0.75rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 500;">${exp.description || exp.vendor || 'Sin descripción'}</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                            ${exp.category || 'Sin categoría'} • ${exp.apartment_code} • ${new Date(exp.date).toLocaleDateString('es-ES')}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-weight: 600; color: var(--danger-color);">${formatCurrency(exp.amount)}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                            ${new Date(exp.created_at).toLocaleString('es-ES')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = expensesList;
+        })
+        .catch(error => {
+            console.error('Error loading recent expenses:', error);
+            document.getElementById('recentExpenses').innerHTML = 
+                '<p style="text-align: center; color: var(--danger-color); padding: 2rem;">Error cargando gastos recientes</p>';
+        });
+}
+
+// Export functions
+function downloadChart(chartId) {
+    const canvas = document.getElementById(chartId);
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${chartId}_${new Date().toISOString().split('T')[0]}.png`;
+    a.click();
+}
+
+function exportToExcel() {
+    // Implementation for Excel export
+    alert('Función de exportación a Excel en desarrollo');
+}
+
+function exportToPDF() {
+    // Implementation for PDF export
+    alert('Función de exportación a PDF en desarrollo');
+}
+
+// Initialize dashboard when data is available
+document.addEventListener('DOMContentLoaded', function() {
+    // Get data from API
+    const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
+    const apartment = document.getElementById('apartmentSelect')?.value || '';
+    
+    let url = `/api/v1/dashboard/data?year=${year}`;
+    if (apartment) {
+        url += `&apartment_code=${apartment}`;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            initializeDashboard(data);
+        })
+        .catch(error => {
+            console.error('Error loading dashboard data:', error);
+        });
+});
+</script>
