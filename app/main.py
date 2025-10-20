@@ -1,6 +1,7 @@
-﻿# app/main.py
+# app/main.py
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 # Importa modelos para que SQLAlchemy “conozca” las tablas
 from . import models  # noqa
@@ -20,6 +21,9 @@ from .routers import vectors
 
 app = FastAPI(title="SES.GASTOS")
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
 # Crear/migrar tablas al arrancar
 @app.on_event("startup")
 def on_startup() -> None:
@@ -35,7 +39,11 @@ def health():
 
 @app.get("/")
 def root():
-    return RedirectResponse(url="/docs")
+    return RedirectResponse(url="/dashboard")
+
+@app.get("/dashboard")
+def dashboard_redirect():
+    return RedirectResponse(url="/api/v1/dashboard/")
 
 # Montar routers (orden no crítico, pero admin al final está bien)
 app.include_router(reservations.router)

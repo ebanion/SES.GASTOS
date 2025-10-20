@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SES.GASTOS - Dashboard</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/index.min.js"></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/dashboard.css">
+    
+    <!-- Inline Styles (fallback) -->
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --background-color: #f8fafc;
+            --surface-color: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        [data-theme="dark"] {
+            --background-color: #0f172a;
+            --surface-color: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: all 0.3s ease;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .dashboard-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .dashboard-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* Controls */
+        .control-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .select, .input {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--surface-color);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .select:focus, .input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: var(--surface-color);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--background-color);
+        }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .theme-toggle:hover {
+            background: var(--background-color);
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .card-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Metric Cards */
+        .metric-card {
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+
+        .metric-change {
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+        }
+
+        .metric-change.positive {
+            color: var(--success-color);
+        }
+
+        .metric-change.negative {
+            color: var(--danger-color);
+        }
+
+        .metric-change.neutral {
+            color: var(--text-secondary);
+        }
+
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 1rem;
+        }
+
+        .chart-container.small {
+            height: 250px;
+        }
+
+        /* Loading States */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            width: 2rem;
+            height: 2rem;
+            border: 2px solid var(--border-color);
+            border-top: 2px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 1rem;
+            }
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .dashboard-controls {
+                justify-content: center;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-container {
+                height: 300px;
+            }
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Status Indicators */
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-success { background: var(--success-color); }
+        .status-warning { background: var(--warning-color); }
+        .status-danger { background: var(--danger-color); }
+
+        /* Table Styles */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table tr:hover {
+            background: var(--background-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">
+                📊 SES.GASTOS Dashboard
+            </h1>
+            
+            <div class="dashboard-controls">
+                <div class="control-group">
+                    <label for="yearSelect">Año:</label>
+                    <select id="yearSelect" class="select" hx-get="/api/v1/dashboard/content" hx-trigger="change" hx-target="#dashboardContent" hx-include="#apartmentSelect">
+                        <option value="2024">2024</option>
+                        <option value="2025" selected>2025</option>
+                        <option value="2026">2026</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="apartmentSelect">Apartamento:</label>
+                    <select id="apartmentSelect" class="select" hx-get="/api/v1/dashboard/content" hx-trigger="change" hx-target="#dashboardContent" hx-include="#yearSelect">
+                        <option value="">Todos los apartamentos</option>
+                        <option value="SES01">SES01</option>
+                        <option value="SES02">SES02</option>
+                        <option value="SES03">SES03</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-primary" onclick="refreshDashboard()">
+                    🔄 Actualizar
+                </button>
+                
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    🌙
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboardContent" hx-get="/api/v1/dashboard/content?year=2025" hx-trigger="load">
+            <div class="loading">
+                <div class="spinner"></div>
+                Cargando dashboard...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for charts
+        let monthlyChart = null;
+        let categoryChart = null;
+        let trendChart = null;
+
+        // Theme management
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            // Update theme toggle icon
+            const toggle = document.querySelector('.theme-toggle');
+            toggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        }
+
+        // Load saved theme
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const toggle = document.querySelector('.theme-toggle');
+            toggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        });
+
+        // Refresh dashboard
+        function refreshDashboard() {
+            const year = document.getElementById('yearSelect').value;
+            const apartment = document.getElementById('apartmentSelect').value;
+            
+            let url = `/api/v1/dashboard/content?year=${year}`;
+            if (apartment) {
+                url += `&apartment_code=${apartment}`;
+            }
+            
+            htmx.ajax('GET', url, {target: '#dashboardContent'});
+        }
+
+        // Format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('es-ES', {
+                style: 'currency',
+                currency: 'EUR'
+            }).format(amount);
+        }
+
+        // Format percentage
+        function formatPercentage(value) {
+            return new Intl.NumberFormat('es-ES', {
+                style: 'percent',
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1
+            }).format(value / 100);
+        }
+
+        // Create monthly overview chart
+        function createMonthlyChart(data) {
+            const ctx = document.getElementById('monthlyChart');
+            if (!ctx) return;
+
+            if (monthlyChart) {
+                monthlyChart.destroy();
+            }
+
+            const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+                          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            
+            const incomes = data.items.map(item => item.incomes_accepted + item.incomes_pending);
+            const expenses = data.items.map(item => item.expenses);
+            const net = data.items.map(item => item.net);
+
+            monthlyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [
+                        {
+                            label: 'Ingresos',
+                            data: incomes,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Gastos',
+                            data: expenses,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Beneficio Neto',
+                            data: net,
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + formatCurrency(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        // Create expenses by category chart
+        function createCategoryChart(data) {
+            const ctx = document.getElementById('categoryChart');
+            if (!ctx) return;
+
+            if (categoryChart) {
+                categoryChart.destroy();
+            }
+
+            // Aggregate expenses by category
+            const categoryTotals = {};
+            data.items.forEach(item => {
+                if (item.expenses_by_category) {
+                    item.expenses_by_category.forEach(cat => {
+                        categoryTotals[cat.category] = (categoryTotals[cat.category] || 0) + cat.total;
+                    });
+                }
+            });
+
+            const categories = Object.keys(categoryTotals);
+            const totals = Object.values(categoryTotals);
+            const colors = [
+                '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6b7280'
+            ];
+
+            categoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: categories,
+                    datasets: [{
+                        data: totals,
+                        backgroundColor: colors.slice(0, categories.length),
+                        borderWidth: 2,
+                        borderColor: 'var(--surface-color)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return context.label + ': ' + formatCurrency(context.parsed) + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Calculate metrics
+        function calculateMetrics(data) {
+            const currentYear = data.items;
+            const totalIncome = currentYear.reduce((sum, item) => sum + item.incomes_accepted + item.incomes_pending, 0);
+            const totalExpenses = currentYear.reduce((sum, item) => sum + item.expenses, 0);
+            const totalNet = totalIncome - totalExpenses;
+            const avgMonthlyNet = totalNet / 12;
+
+            return {
+                totalIncome,
+                totalExpenses,
+                totalNet,
+                avgMonthlyNet,
+                profitMargin: totalIncome > 0 ? (totalNet / totalIncome) * 100 : 0
+            };
+        }
+
+        // HTMX event listeners
+        document.addEventListener('htmx:afterSwap', function(event) {
+            if (event.detail.target.id === 'dashboardContent') {
+                // Parse the response and create charts
+                const scripts = event.detail.target.querySelectorAll('script');
+                scripts.forEach(script => {
+                    if (script.textContent.includes('dashboardData')) {
+                        eval(script.textContent);
+                    }
+                });
+            }
+        });
+
+        // Auto-refresh every 5 minutes
+        setInterval(refreshDashboard, 5 * 60 * 1000);
+    </script>
+    
+    <!-- Custom Dashboard Script -->
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>
