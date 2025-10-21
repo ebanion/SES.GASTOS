@@ -45,3 +45,4 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_ar
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
