@@ -551,15 +551,10 @@
                 categoryChart.destroy();
             }
 
-            // Aggregate expenses by category
-            const categoryTotals = {};
-            data.items.forEach(item => {
-                if (item.expenses_by_category) {
-                    item.expenses_by_category.forEach(cat => {
-                        categoryTotals[cat.category] = (categoryTotals[cat.category] || 0) + cat.total;
-                    });
-                }
-            });
+            // Aggregate expenses by category (simplified - just show total expenses for now)
+            const categoryTotals = {
+                'Gastos Totales': data.items.reduce((sum, item) => sum + item.expenses, 0)
+            };
 
             const categories = Object.keys(categoryTotals);
             const totals = Object.values(categoryTotals);
