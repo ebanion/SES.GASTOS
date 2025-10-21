@@ -138,8 +138,12 @@ def dashboard_monthly(
 @router.get("/", response_class=HTMLResponse)
 def dashboard_page():
     """Serve the dashboard HTML page"""
+    import os
     try:
-        with open("/workspace/app/templates/dashboard.html", "r", encoding="utf-8") as f:
+        # Get the path relative to this file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        template_path = os.path.join(current_dir, "templates", "dashboard.html")
+        with open(template_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Dashboard template not found")
@@ -151,8 +155,12 @@ def dashboard_content(
     db: Session = Depends(get_db),
 ):
     """Serve dashboard content for HTMX updates"""
+    import os
     try:
-        with open("/workspace/app/templates/dashboard_content.html", "r", encoding="utf-8") as f:
+        # Get the path relative to this file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        template_path = os.path.join(current_dir, "templates", "dashboard_content.html")
+        with open(template_path, "r", encoding="utf-8") as f:
             content = f.read()
         
         # Get dashboard data to inject
