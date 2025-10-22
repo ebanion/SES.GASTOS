@@ -22,9 +22,20 @@ def require_internal_key(x_internal_key: str | None = Header(default=None, alias
         raise HTTPException(status_code=403, detail="Forbidden")
 
 # --- Embeddings helper ---
-client = OpenAI()
+try:
+    client = OpenAI()
+except Exception as e:
+    import os
+    if not os.getenv("OPENAI_API_KEY"):
+        print("⚠️ OPENAI_API_KEY not configured - Vector functionality disabled")
+        client = None
+    else:
+        raise e
 
 def embed_text(text: str) -> List[float]:
+    if client is None:
+        print("⚠️ OpenAI client not available - returning empty embedding")
+        return []
     try:
         resp = client.embeddings.create(model="text-embedding-3-small", input=text[:3000])
         return resp.data[0].embedding
@@ -43,6 +54,8 @@ def insert_vector(
     vat_rate: float | None = None,
     db: Session = Depends(get_db),
 ):
+    if client is None:
+        raise HTTPException(status_code=503, detail="OpenAI API not configured - vector functionality disabled")
     emb = embed_text(text_snippet)
     q = text("""
         INSERT INTO expense_vectors (id, apartment_id, model, embedding, text_snippet, vendor, category, vat_rate)
@@ -79,6 +92,8 @@ def search_vectors(
     k: int = 5,
     db: Session = Depends(get_db),
 ):
+    if client is None:
+        raise HTTPException(status_code=503, detail="OpenAI API not configured - vector functionality disabled")
     emb = embed_text(query)
     q = text("""
         SELECT id, vendor, category, vat_rate,
