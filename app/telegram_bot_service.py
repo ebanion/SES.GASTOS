@@ -42,9 +42,10 @@ class TelegramBotService:
     def start_bot_in_thread(self):
         """Iniciar el bot en un hilo separado"""
         if not self.should_start_bot():
+            logger.warning("❌ Bot no puede iniciarse - configuración incompleta")
             return
             
-        if self.is_running:
+        if self.is_running and self.bot_thread and self.bot_thread.is_alive():
             logger.info("Bot ya está ejecutándose")
             return
         
@@ -58,12 +59,26 @@ class TelegramBotService:
                 bot_main()
                 
             except Exception as e:
-                logger.error(f"Error ejecutando bot: {e}")
+                logger.error(f"❌ Error ejecutando bot: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                self.is_running = False
         
-        self.bot_thread = threading.Thread(target=run_bot, daemon=True)
+        # Detener hilo anterior si existe
+        if self.bot_thread and self.bot_thread.is_alive():
+            logger.info("Deteniendo hilo anterior del bot...")
+        
+        self.bot_thread = threading.Thread(target=run_bot, daemon=True, name="TelegramBot")
         self.bot_thread.start()
         self.is_running = True
         logger.info("🚀 Bot de Telegram iniciado en hilo separado")
+        
+        # Verificar que el hilo se inició correctamente
+        import time
+        time.sleep(2)
+        if not self.bot_thread.is_alive():
+            logger.error("❌ El hilo del bot murió inmediatamente después de iniciarse")
+            self.is_running = False
     
     def stop_bot(self):
         """Detener el bot"""
@@ -75,11 +90,20 @@ class TelegramBotService:
     
     def get_status(self) -> dict:
         """Obtener estado del bot"""
+        thread_alive = self.bot_thread.is_alive() if self.bot_thread else False
+        
+        # Si el hilo murió, actualizar el estado
+        if self.is_running and not thread_alive:
+            logger.warning("⚠️ Detectado hilo muerto, actualizando estado")
+            self.is_running = False
+        
         return {
             "bot_running": self.is_running,
             "telegram_token_configured": bool(os.getenv("TELEGRAM_TOKEN")),
             "openai_key_configured": bool(os.getenv("OPENAI_API_KEY")),
-            "thread_alive": self.bot_thread.is_alive() if self.bot_thread else False
+            "thread_alive": thread_alive,
+            "thread_name": self.bot_thread.name if self.bot_thread else None,
+            "should_start": self.should_start_bot()
         }
 
 # Instancia global del servicio

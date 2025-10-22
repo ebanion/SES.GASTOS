@@ -132,8 +132,38 @@ def restart_bot():
     try:
         from .telegram_bot_service import telegram_service
         telegram_service.stop_bot()
+        import time
+        time.sleep(2)  # Esperar un poco antes de reiniciar
         telegram_service.start_bot_in_thread()
         return {"success": True, "message": "Bot reiniciado"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/bot/test-connection")
+def test_bot_connection():
+    """Probar conexión del bot con Telegram"""
+    try:
+        import os
+        token = os.getenv("TELEGRAM_TOKEN")
+        if not token:
+            return {"success": False, "error": "TELEGRAM_TOKEN no configurado"}
+        
+        # Probar conexión básica con Telegram API
+        import requests
+        response = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10)
+        
+        if response.status_code == 200:
+            bot_info = response.json()
+            return {
+                "success": True, 
+                "bot_info": bot_info,
+                "message": "Conexión con Telegram exitosa"
+            }
+        else:
+            return {
+                "success": False, 
+                "error": f"Error HTTP {response.status_code}: {response.text}"
+            }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
