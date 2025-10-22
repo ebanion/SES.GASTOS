@@ -31,7 +31,7 @@ user_sessions: Dict[int, Dict[str, Any]] = {}
 # Aplicación de Telegram
 telegram_app = None
 
-def init_telegram_app():
+async def init_telegram_app():
     """Inicializar aplicación de Telegram"""
     global telegram_app
     
@@ -49,6 +49,9 @@ def init_telegram_app():
     telegram_app.add_handler(CommandHandler("status", status_command))
     telegram_app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    
+    # IMPORTANTE: Inicializar la aplicación
+    await telegram_app.initialize()
     
     logger.info("🤖 Aplicación de Telegram inicializada con webhooks")
     return telegram_app
@@ -224,30 +227,35 @@ async def handle_text(update: Update, context):
 async def telegram_webhook(request: Request):
     """Endpoint para recibir webhooks de Telegram"""
     try:
-        if not telegram_app:
-            raise HTTPException(status_code=503, detail="Bot no inicializado")
+        # Asegurar que la aplicación esté inicializada
+        app = await ensure_telegram_app_initialized()
+        if not app:
+            raise HTTPException(status_code=503, detail="Bot no inicializado - TELEGRAM_TOKEN faltante")
         
         # Obtener datos del webhook
         data = await request.json()
-        update = Update.de_json(data, telegram_app.bot)
+        update = Update.de_json(data, app.bot)
         
         # Procesar update
-        await telegram_app.process_update(update)
+        await app.process_update(update)
         
         return {"ok": True}
     except Exception as e:
         logger.error(f"Error procesando webhook: {e}")
+        import traceback
+        logger.error(f"Traceback completo: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @webhook_router.get("/telegram/info")
 async def telegram_info():
     """Información del bot y webhook"""
-    if not telegram_app:
-        return {"error": "Bot no inicializado"}
-    
     try:
-        bot_info = await telegram_app.bot.get_me()
-        webhook_info = await telegram_app.bot.get_webhook_info()
+        app = await ensure_telegram_app_initialized()
+        if not app:
+            return {"error": "Bot no inicializado - TELEGRAM_TOKEN faltante"}
+        
+        bot_info = await app.bot.get_me()
+        webhook_info = await app.bot.get_webhook_info()
         
         return {
             "bot": {
@@ -262,11 +270,77 @@ async def telegram_info():
             }
         }
     except Exception as e:
+        logger.error(f"Error obteniendo info del bot: {e}")
         return {"error": str(e)}
 
+@webhook_router.post("/telegram/setup")
+async def setup_telegram_webhook():
+    """Configurar webhook de Telegram automáticamente"""
+    try:
+        app = await ensure_telegram_app_initialized()
+        if not app:
+            return {"success": False, "error": "Bot no inicializado - TELEGRAM_TOKEN faltante"}
+        
+        # URL del webhook
+        webhook_url = f"{API_BASE_URL}/webhook/telegram"
+        
+        # Configurar webhook
+        success = await app.bot.set_webhook(url=webhook_url)
+        
+        if success:
+            webhook_info = await app.bot.get_webhook_info()
+            return {
+                "success": True,
+                "message": "Webhook configurado correctamente",
+                "webhook_url": webhook_url,
+                "webhook_info": {
+                    "url": webhook_info.url,
+                    "pending_updates": webhook_info.pending_update_count
+                }
+            }
+        else:
+            return {"success": False, "error": "No se pudo configurar el webhook"}
+            
+    except Exception as e:
+        logger.error(f"Error configurando webhook: {e}")
+        return {"success": False, "error": str(e)}
+
+@webhook_router.delete("/telegram/webhook")
+async def delete_telegram_webhook():
+    """Eliminar webhook de Telegram (volver a polling)"""
+    try:
+        app = await ensure_telegram_app_initialized()
+        if not app:
+            return {"success": False, "error": "Bot no inicializado"}
+        
+        success = await app.bot.delete_webhook()
+        return {
+            "success": success,
+            "message": "Webhook eliminado" if success else "Error eliminando webhook"
+        }
+    except Exception as e:
+        logger.error(f"Error eliminando webhook: {e}")
+        return {"success": False, "error": str(e)}
+
 # Inicializar al importar
-if TELEGRAM_TOKEN:
-    telegram_app = init_telegram_app()
+telegram_app = None
+_initialization_task = None
+
+async def ensure_telegram_app_initialized():
+    """Asegurar que la aplicación de Telegram esté inicializada"""
+    global telegram_app, _initialization_task
+    
+    if telegram_app is not None:
+        return telegram_app
+    
+    if not TELEGRAM_TOKEN:
+        logger.warning("❌ TELEGRAM_TOKEN no configurado - webhook bot deshabilitado")
+        return None
+    
+    # Evitar múltiples inicializaciones concurrentes
+    if _initialization_task is None:
+        _initialization_task = init_telegram_app()
+    
+    telegram_app = await _initialization_task
     logger.info("🤖 Bot webhook inicializado")
-else:
-    logger.warning("❌ TELEGRAM_TOKEN no configurado - webhook bot deshabilitado")
+    return telegram_app
