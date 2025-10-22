@@ -48,6 +48,7 @@ async def init_telegram_app():
     telegram_app.add_handler(CommandHandler("reset", reset_apartamento))
     telegram_app.add_handler(CommandHandler("status", status_command))
     telegram_app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    telegram_app.add_handler(MessageHandler(filters.Document.PDF, handle_document))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
     # IMPORTANTE: Inicializar la aplicación
@@ -61,13 +62,22 @@ async def start(update: Update, context):
     user_name = update.effective_user.first_name or "Usuario"
     await update.message.reply_text(
         f"¡Hola {user_name}! 👋\n\n"
-        f"🤖 Bot SES.GASTOS funcionando en producción!\n\n"
-        f"📋 **Pasos:**\n"
-        f"1️⃣ /usar SES01 (configurar apartamento)\n"
-        f"2️⃣ Enviar foto 📸 de factura\n"
-        f"3️⃣ Introducir datos manualmente\n"
-        f"4️⃣ ¡Gasto registrado automáticamente!\n\n"
-        f"🌐 Dashboard: {API_BASE_URL}/api/v1/dashboard/"
+        f"🤖 **Bot SES.GASTOS con IA + OCR**\n\n"
+        f"📋 **Pasos para usar:**\n"
+        f"1️⃣ `/usar SES01` - Configurar apartamento\n"
+        f"2️⃣ **Enviar factura:**\n"
+        f"   📸 **Foto de factura** → Procesamiento automático con IA\n"
+        f"   📄 **PDF de factura** → Extracción completa con OCR\n"
+        f"   📝 **Datos manuales** → Si prefieres escribir\n\n"
+        f"🤖 **Procesamiento Automático:**\n"
+        f"• 📅 Fecha de la factura\n"
+        f"• 💰 Importe total\n"
+        f"• 🏪 Proveedor/Empresa\n"
+        f"• 📂 Categoría del gasto\n"
+        f"• 🧾 Número de factura\n"
+        f"• 💼 IVA y retenciones\n\n"
+        f"🌐 **Dashboard:** {API_BASE_URL}/api/v1/dashboard/\n\n"
+        f"💡 **Tip:** Las fotos deben ser claras y los PDFs legibles."
     )
 
 async def usar_apartamento(update: Update, context):
@@ -180,7 +190,7 @@ async def status_command(update: Update, context):
         await update.message.reply_text(f"❌ Error técnico: {str(e)}")
 
 async def handle_photo(update: Update, context):
-    """Manejar fotos - modo manual"""
+    """Manejar fotos con OCR + IA automático"""
     user_id = update.effective_user.id
     session = user_sessions.get(user_id, {})
     
@@ -188,17 +198,143 @@ async def handle_photo(update: Update, context):
         await update.message.reply_text("❌ Configura apartamento primero: /usar SES01")
         return
     
+    apartment_code = session.get("apartment_code")
+    
+    # Mensaje inicial
     await update.message.reply_text(
-        f"📸 **Foto recibida para {session['apartment_code']}**\n\n"
-        f"📝 **Introduce los datos manualmente:**\n\n"
-        f"**Formato (una línea por dato):**\n"
-        f"2025-01-21\n"
-        f"45.50\n"
-        f"Restaurante El Buen Comer\n"
-        f"Restauración\n"
-        f"Cena de negocios\n\n"
-        f"💡 Copia y pega este formato con tus datos reales."
+        f"📸 **Procesando foto para {apartment_code}**\n\n"
+        f"🔍 Extrayendo texto con OCR...\n"
+        f"🤖 Analizando con IA...\n\n"
+        f"⏳ Esto puede tardar unos segundos..."
     )
+    
+    try:
+        # Descargar la foto
+        photo_file = await update.message.photo[-1].get_file()
+        
+        # Crear archivo temporal
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+            await photo_file.download_to_drive(temp_file.name)
+            temp_path = temp_file.name
+        
+        try:
+            # Extraer texto con OCR
+            from .bot.Ocr_untils import extract_text_from_image
+            raw_text = extract_text_from_image(temp_path)
+            
+            if not raw_text.strip():
+                await update.message.reply_text(
+                    f"❌ **No se pudo extraer texto de la imagen**\n\n"
+                    f"Posibles causas:\n"
+                    f"• Imagen muy borrosa\n"
+                    f"• Texto muy pequeño\n"
+                    f"• Idioma no reconocido\n\n"
+                    f"💡 **Prueba con:**\n"
+                    f"• Foto más clara y enfocada\n"
+                    f"• Mejor iluminación\n"
+                    f"• O introduce los datos manualmente:\n\n"
+                    f"**Formato:**\n"
+                    f"2025-01-22\n"
+                    f"45.50\n"
+                    f"Proveedor\n"
+                    f"Categoría\n"
+                    f"Descripción"
+                )
+                return
+            
+            # Procesar con IA
+            from .bot.Llm_Untils import extract_expense_json
+            expense_data = extract_expense_json(raw_text, apartment_code)
+            
+            if not expense_data.get("amount_gross"):
+                await update.message.reply_text(
+                    f"❌ **No se pudo extraer información suficiente**\n\n"
+                    f"📄 **Texto extraído:**\n"
+                    f"```\n{raw_text[:500]}...\n```\n\n"
+                    f"💡 **Introduce los datos manualmente:**\n"
+                    f"2025-01-22\n"
+                    f"45.50\n"
+                    f"Proveedor\n"
+                    f"Categoría\n"
+                    f"Descripción"
+                )
+                return
+            
+            # Convertir apartment_code a apartment_id
+            expense_data["apartment_id"] = session.get("apartment_id")
+            if "apartment_code" in expense_data:
+                del expense_data["apartment_code"]
+            
+            # Crear gasto automáticamente
+            import httpx
+            headers = {"Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY}
+            
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/api/v1/expenses/", 
+                    json=expense_data, 
+                    headers=headers
+                )
+                
+                if response.status_code in [200, 201]:
+                    result = response.json()
+                    await update.message.reply_text(
+                        f"✅ **¡Gasto procesado automáticamente!**\n\n"
+                        f"🤖 **Datos extraídos por IA:**\n"
+                        f"📅 Fecha: {expense_data.get('date', 'N/A')}\n"
+                        f"💰 Importe: €{expense_data.get('amount_gross', 0)}\n"
+                        f"🏪 Proveedor: {expense_data.get('vendor', 'N/A')}\n"
+                        f"📂 Categoría: {expense_data.get('category', 'N/A')}\n"
+                        f"📄 Descripción: {expense_data.get('description', 'N/A')}\n"
+                        f"🏠 Apartamento: {apartment_code}\n\n"
+                        f"🆔 ID: {result.get('expense_id', 'N/A')}\n\n"
+                        f"🌐 Ver en: {API_BASE_URL}/api/v1/dashboard/\n\n"
+                        f"💡 Si algo es incorrecto, puedes editarlo en el dashboard."
+                    )
+                else:
+                    await update.message.reply_text(
+                        f"❌ **Error guardando el gasto**\n\n"
+                        f"📊 **Datos extraídos:**\n"
+                        f"📅 Fecha: {expense_data.get('date', 'N/A')}\n"
+                        f"💰 Importe: €{expense_data.get('amount_gross', 0)}\n"
+                        f"🏪 Proveedor: {expense_data.get('vendor', 'N/A')}\n\n"
+                        f"🔧 Error del servidor: HTTP {response.status_code}\n"
+                        f"Intenta de nuevo o introduce manualmente."
+                    )
+        
+        finally:
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+                
+    except ImportError as e:
+        await update.message.reply_text(
+            f"❌ **OCR no disponible en este entorno**\n\n"
+            f"🔧 Error técnico: {str(e)}\n\n"
+            f"💡 **Introduce los datos manualmente:**\n"
+            f"2025-01-22\n"
+            f"45.50\n"
+            f"Proveedor\n"
+            f"Categoría\n"
+            f"Descripción"
+        )
+    except Exception as e:
+        logger.error(f"Error procesando foto: {e}")
+        await update.message.reply_text(
+            f"❌ **Error procesando la imagen**\n\n"
+            f"🔧 Error técnico: {str(e)}\n\n"
+            f"💡 **Introduce los datos manualmente:**\n"
+            f"2025-01-22\n"
+            f"45.50\n"
+            f"Proveedor\n"
+            f"Categoría\n"
+            f"Descripción"
+        )
 
 async def handle_text(update: Update, context):
     """Manejar texto para gastos manuales"""
@@ -406,3 +542,159 @@ async def ensure_telegram_app_initialized():
     telegram_app = await _initialization_task
     logger.info("🤖 Bot webhook inicializado")
     return telegram_app
+
+async def handle_document(update: Update, context):
+    """Manejar documentos PDF con OCR + IA automático"""
+    user_id = update.effective_user.id
+    session = user_sessions.get(user_id, {})
+    
+    if not session.get("apartment_code"):
+        await update.message.reply_text("❌ Configura apartamento primero: /usar SES01")
+        return
+    
+    apartment_code = session.get("apartment_code")
+    document = update.message.document
+    
+    # Verificar que sea PDF
+    if not document.file_name.lower().endswith('.pdf'):
+        await update.message.reply_text(
+            f"❌ **Solo se admiten archivos PDF**\n\n"
+            f"📄 Archivo recibido: {document.file_name}\n"
+            f"💡 Envía una foto o un archivo PDF de la factura."
+        )
+        return
+    
+    # Mensaje inicial
+    await update.message.reply_text(
+        f"📄 **Procesando PDF para {apartment_code}**\n\n"
+        f"📥 Descargando: {document.file_name}\n"
+        f"🔍 Extrayendo texto con OCR...\n"
+        f"🤖 Analizando con IA...\n\n"
+        f"⏳ Esto puede tardar unos segundos..."
+    )
+    
+    try:
+        # Descargar el PDF
+        pdf_file = await document.get_file()
+        
+        # Crear archivo temporal
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            await pdf_file.download_to_drive(temp_file.name)
+            temp_path = temp_file.name
+        
+        try:
+            # Extraer texto con OCR
+            from .bot.Ocr_untils import extract_text_from_pdf
+            raw_text = extract_text_from_pdf(temp_path)
+            
+            if not raw_text.strip():
+                await update.message.reply_text(
+                    f"❌ **No se pudo extraer texto del PDF**\n\n"
+                    f"📄 Archivo: {document.file_name}\n"
+                    f"Posibles causas:\n"
+                    f"• PDF escaneado de baja calidad\n"
+                    f"• Texto muy pequeño o borroso\n"
+                    f"• PDF protegido o encriptado\n\n"
+                    f"💡 **Prueba con:**\n"
+                    f"• PDF de mejor calidad\n"
+                    f"• Foto clara de la factura\n"
+                    f"• O introduce los datos manualmente"
+                )
+                return
+            
+            # Procesar con IA
+            from .bot.Llm_Untils import extract_expense_json
+            expense_data = extract_expense_json(raw_text, apartment_code)
+            
+            if not expense_data.get("amount_gross"):
+                await update.message.reply_text(
+                    f"❌ **No se pudo extraer información suficiente**\n\n"
+                    f"📄 **Texto extraído del PDF:**\n"
+                    f"```\n{raw_text[:500]}...\n```\n\n"
+                    f"💡 **Introduce los datos manualmente:**\n"
+                    f"2025-01-22\n"
+                    f"45.50\n"
+                    f"Proveedor\n"
+                    f"Categoría\n"
+                    f"Descripción"
+                )
+                return
+            
+            # Convertir apartment_code a apartment_id
+            expense_data["apartment_id"] = session.get("apartment_id")
+            if "apartment_code" in expense_data:
+                del expense_data["apartment_code"]
+            
+            # Crear gasto automáticamente
+            import httpx
+            headers = {"Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY}
+            
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/api/v1/expenses/", 
+                    json=expense_data, 
+                    headers=headers
+                )
+                
+                if response.status_code in [200, 201]:
+                    result = response.json()
+                    await update.message.reply_text(
+                        f"✅ **¡PDF procesado automáticamente!**\n\n"
+                        f"📄 **Archivo:** {document.file_name}\n"
+                        f"🤖 **Datos extraídos por IA:**\n"
+                        f"📅 Fecha: {expense_data.get('date', 'N/A')}\n"
+                        f"💰 Importe: €{expense_data.get('amount_gross', 0)}\n"
+                        f"🏪 Proveedor: {expense_data.get('vendor', 'N/A')}\n"
+                        f"📂 Categoría: {expense_data.get('category', 'N/A')}\n"
+                        f"📄 Descripción: {expense_data.get('description', 'N/A')}\n"
+                        f"🧾 Factura: {expense_data.get('invoice_number', 'N/A')}\n"
+                        f"💼 IVA: {expense_data.get('vat_rate', 'N/A')}%\n"
+                        f"🏠 Apartamento: {apartment_code}\n\n"
+                        f"🆔 ID: {result.get('expense_id', 'N/A')}\n\n"
+                        f"🌐 Ver en: {API_BASE_URL}/api/v1/dashboard/\n\n"
+                        f"💡 Si algo es incorrecto, puedes editarlo en el dashboard."
+                    )
+                else:
+                    await update.message.reply_text(
+                        f"❌ **Error guardando el gasto**\n\n"
+                        f"📊 **Datos extraídos del PDF:**\n"
+                        f"📅 Fecha: {expense_data.get('date', 'N/A')}\n"
+                        f"💰 Importe: €{expense_data.get('amount_gross', 0)}\n"
+                        f"🏪 Proveedor: {expense_data.get('vendor', 'N/A')}\n\n"
+                        f"🔧 Error del servidor: HTTP {response.status_code}\n"
+                        f"Intenta de nuevo o introduce manualmente."
+                    )
+        
+        finally:
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+                
+    except ImportError as e:
+        await update.message.reply_text(
+            f"❌ **OCR no disponible en este entorno**\n\n"
+            f"🔧 Error técnico: {str(e)}\n\n"
+            f"💡 **Introduce los datos manualmente:**\n"
+            f"2025-01-22\n"
+            f"45.50\n"
+            f"Proveedor\n"
+            f"Categoría\n"
+            f"Descripción"
+        )
+    except Exception as e:
+        logger.error(f"Error procesando PDF: {e}")
+        await update.message.reply_text(
+            f"❌ **Error procesando el PDF**\n\n"
+            f"🔧 Error técnico: {str(e)}\n\n"
+            f"💡 **Introduce los datos manualmente:**\n"
+            f"2025-01-22\n"
+            f"45.50\n"
+            f"Proveedor\n"
+            f"Categoría\n"
+            f"Descripción"
+        )
