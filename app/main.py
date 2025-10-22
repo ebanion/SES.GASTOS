@@ -1,4 +1,5 @@
 # app/main.py
+import os
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
