@@ -152,8 +152,8 @@ def dashboard_monthly(
     inc_q = (
         db.query(
             func.extract("month", models.Income.date).label("m"),
-            func.coalesce(func.sum(case((models.Income.status == "CONFIRMED", models.Income.amount), else_=0)), 0).label("inc_acc"),
-            func.coalesce(func.sum(case((models.Income.status == "PENDING",  models.Income.amount), else_=0)), 0).label("inc_pen"),
+            func.coalesce(func.sum(case((models.Income.status == "CONFIRMED", models.Income.amount_gross), else_=0)), 0).label("inc_acc"),
+            func.coalesce(func.sum(case((models.Income.status == "PENDING",  models.Income.amount_gross), else_=0)), 0).label("inc_pen"),
         )
         .filter(and_(*inc_filter))
         .group_by("m")
@@ -233,7 +233,24 @@ def dashboard_content(
         })
     except Exception as e:
         print(f"Error in dashboard_content: {e}")
-        return HTMLResponse(content=f'<div class="error">Error loading dashboard: {str(e)}</div>')
+        import traceback
+        traceback.print_exc()
+        
+        # Return a more helpful error message
+        error_html = f'''
+        <div class="error" style="padding: 20px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 5px; margin: 20px; color: #991b1b;">
+            <h3>🚨 Error loading dashboard</h3>
+            <p><strong>Error:</strong> {str(e)}</p>
+            <p><strong>Possible causes:</strong></p>
+            <ul>
+                <li>Database connection issues</li>
+                <li>Missing or incorrect database credentials</li>
+                <li>Database tables not created</li>
+            </ul>
+            <p><a href="/api/v1/dashboard/health" style="color: #2563eb;">🔍 Check system health</a></p>
+        </div>
+        '''
+        return HTMLResponse(content=error_html)
 
 @router.get("/data", response_model=DashboardMonthlyResponse)
 def dashboard_data(
