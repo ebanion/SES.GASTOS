@@ -12,6 +12,9 @@ def extract_text_from_image(image_path: str) -> str:
         import platform
         if platform.system() == "Windows":
             pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        else:
+            # Linux/Unix (Render)
+            pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
         
         from PIL import Image
         image = Image.open(image_path)
@@ -24,10 +27,13 @@ def extract_text_from_image(image_path: str) -> str:
 def extract_text_from_pdf(pdf_path: str) -> str:
     text = ""
 
-    # Configurar ruta de Tesseract (importante para Windows)
+    # Configurar ruta de Tesseract para diferentes sistemas
     import platform
     if platform.system() == "Windows":
         pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    else:
+        # Linux/Unix (Render)
+        pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
     # 1. Intentar extracción directa con pdfplumber (si hay texto digital)
     try:

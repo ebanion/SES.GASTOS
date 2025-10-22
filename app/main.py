@@ -32,6 +32,23 @@ def on_startup() -> None:
         print("[startup] DB ready")
     except Exception as e:
         print(f"[startup] create_all failed: {e}")
+    
+    # Iniciar bot de Telegram
+    try:
+        from .telegram_bot_service import telegram_service
+        telegram_service.start_bot_in_thread()
+        print("[startup] Telegram bot service started")
+    except Exception as e:
+        print(f"[startup] Telegram bot failed to start: {e}")
+
+@app.on_event("shutdown")
+def on_shutdown() -> None:
+    try:
+        from .telegram_bot_service import telegram_service
+        telegram_service.stop_bot()
+        print("[shutdown] Telegram bot service stopped")
+    except Exception as e:
+        print(f"[shutdown] Error stopping bot: {e}")
 
 @app.get("/health")
 def health():
@@ -70,6 +87,26 @@ app.include_router(vectors.router)
 @app.get("/debug/routes")
 def list_routes():
     return sorted([getattr(r, "path", "") for r in app.router.routes])
+
+@app.get("/bot/status")
+def bot_status():
+    """Obtener estado del bot de Telegram"""
+    try:
+        from .telegram_bot_service import telegram_service
+        return telegram_service.get_status()
+    except Exception as e:
+        return {"error": str(e), "bot_running": False}
+
+@app.post("/bot/restart")
+def restart_bot():
+    """Reiniciar el bot de Telegram"""
+    try:
+        from .telegram_bot_service import telegram_service
+        telegram_service.stop_bot()
+        telegram_service.start_bot_in_thread()
+        return {"success": True, "message": "Bot reiniciado"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.post("/init-demo-data")
 def init_demo_data():

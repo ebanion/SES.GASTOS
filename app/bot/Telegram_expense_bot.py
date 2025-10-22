@@ -17,9 +17,16 @@ from telegram.ext import (
 from dotenv import load_dotenv
 load_dotenv()  # Carga .env
 
-from Ocr_untils import extract_text_from_pdf
-from Llm_Untils import extract_expense_json
-from Api_Utils import send_expense_to_backend, get_apartment_id_by_code  # <-- usa apartment_id si lo pasamos
+# Importaciones relativas para cuando se ejecuta como módulo
+try:
+    from .Ocr_untils import extract_text_from_pdf, extract_text_from_image
+    from .Llm_Untils import extract_expense_json
+    from .Api_Utils import send_expense_to_backend, get_apartment_id_by_code
+except ImportError:
+    # Importaciones absolutas para cuando se ejecuta directamente
+    from Ocr_untils import extract_text_from_pdf, extract_text_from_image
+    from Llm_Untils import extract_expense_json
+    from Api_Utils import send_expense_to_backend, get_apartment_id_by_code
 
 # ---------------------------------------------------------------------
 # Config

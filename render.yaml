@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ses-gastos
+    env: python
+    buildCommand: |
+      # Instalar dependencias del sistema
+      apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-spa poppler-utils
+      # Instalar dependencias de Python
+      pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: TESSDATA_PREFIX
+        value: /usr/share/tesseract-ocr/4.00/tessdata/
