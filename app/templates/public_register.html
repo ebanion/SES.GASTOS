@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SES.GASTOS - Registrar Apartamento</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            overflow: hidden;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.95rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-group small {
+            color: #6b7280;
+            font-size: 0.85rem;
+            margin-top: 5px;
+            display: block;
+        }
+
+        .btn {
+            width: 100%;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+
+        .features {
+            background: #f9fafb;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+        }
+
+        .features h3 {
+            color: #1f2937;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .features ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .features li {
+            padding: 8px 0;
+            color: #4b5563;
+            position: relative;
+            padding-left: 25px;
+        }
+
+        .features li:before {
+            content: "✅";
+            position: absolute;
+            left: 0;
+        }
+
+        .code-checker {
+            background: #eff6ff;
+            border: 1px solid #2563eb;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .code-available {
+            color: #059669;
+            font-weight: 600;
+        }
+
+        .code-taken {
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .next-steps {
+            background: #f0fdf4;
+            border: 1px solid #10b981;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .next-steps h4 {
+            color: #065f46;
+            margin-bottom: 15px;
+        }
+
+        .next-steps ol {
+            color: #166534;
+            margin-left: 20px;
+        }
+
+        .next-steps li {
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                padding: 30px 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 SES.GASTOS</h1>
+            <p>Registra tu apartamento</p>
+        </div>
+
+        <div class="content">
+            <!-- Características -->
+            <div class="features">
+                <h3>🚀 ¿Qué obtienes?</h3>
+                <ul>
+                    <li>Bot de Telegram con IA para procesar facturas</li>
+                    <li>OCR automático de fotos y PDFs</li>
+                    <li>Dashboard web con informes financieros</li>
+                    <li>Categorización automática de gastos</li>
+                    <li>Extracción de IVA y retenciones</li>
+                </ul>
+            </div>
+
+            <!-- Alerta -->
+            <div id="alert" style="display: none;"></div>
+
+            <!-- Formulario -->
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="code">Código del Apartamento *</label>
+                    <input type="text" id="code" name="code" placeholder="Ej: APT001, VILLA123" required>
+                    <small>Será tu identificador único en el bot. Debe tener al menos 3 caracteres.</small>
+                    <div id="codeChecker" style="display: none;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="name">Nombre del Apartamento *</label>
+                    <input type="text" id="name" name="name" placeholder="Ej: Apartamento Centro, Villa Playa" required>
+                    <small>Nombre descriptivo para identificar tu propiedad.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="owner_email">Tu Email *</label>
+                    <input type="email" id="owner_email" name="owner_email" placeholder="tu@email.com" required>
+                    <small>Para notificaciones y recuperación de acceso.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="owner_name">Tu Nombre (Opcional)</label>
+                    <input type="text" id="owner_name" name="owner_name" placeholder="Juan Pérez">
+                    <small>Para personalizar las comunicaciones.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Teléfono (Opcional)</label>
+                    <input type="tel" id="phone" name="phone" placeholder="+34 600 123 456">
+                    <small>Para soporte técnico si es necesario.</small>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">
+                    🏠 Registrar Mi Apartamento
+                </button>
+            </form>
+
+            <!-- Pasos siguientes (oculto inicialmente) -->
+            <div id="nextSteps" class="next-steps" style="display: none;">
+                <h4>🎉 ¡Registro Exitoso!</h4>
+                <ol id="stepsList"></ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let codeCheckTimeout;
+
+        // Verificar disponibilidad del código
+        document.getElementById('code').addEventListener('input', function(e) {
+            const code = e.target.value.toUpperCase().trim();
+            const checker = document.getElementById('codeChecker');
+            
+            if (code.length < 3) {
+                checker.style.display = 'none';
+                return;
+            }
+
+            clearTimeout(codeCheckTimeout);
+            codeCheckTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/public/check/${code}`);
+                    const result = await response.json();
+                    
+                    checker.style.display = 'block';
+                    checker.className = 'code-checker';
+                    
+                    if (result.available) {
+                        checker.innerHTML = `<span class="code-available">✅ ${result.message}</span>`;
+                    } else {
+                        checker.innerHTML = `<span class="code-taken">❌ ${result.message}</span>`;
+                    }
+                } catch (error) {
+                    checker.style.display = 'none';
+                }
+            }, 500);
+        });
+
+        // Manejar envío del formulario
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.textContent;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Registrando...';
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch(`${API_BASE}/public/register-apartment`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert(`✅ ${result.message}`, 'success');
+                    
+                    // Mostrar pasos siguientes
+                    const nextSteps = document.getElementById('nextSteps');
+                    const stepsList = document.getElementById('stepsList');
+                    
+                    stepsList.innerHTML = result.next_steps.map(step => `<li>${step}</li>`).join('');
+                    nextSteps.style.display = 'block';
+                    
+                    // Ocultar formulario
+                    e.target.style.display = 'none';
+                    
+                } else {
+                    showAlert(`❌ ${result.detail}`, 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            } catch (error) {
+                showAlert(`❌ Error de conexión: ${error.message}`, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+
+        // Función para mostrar alertas
+        function showAlert(message, type = 'success') {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            
+            // Auto-hide para errores
+            if (type === 'error') {
+                setTimeout(() => alert.style.display = 'none', 8000);
+            }
+        }
+
+        // Convertir código a mayúsculas automáticamente
+        document.getElementById('code').addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase();
+        });
+    </script>
+</body>
+</html>

@@ -10,7 +10,7 @@ from . import models  # noqa
 from .db import Base, engine
 
 # Routers
-from .routers import reservations, expenses, apartments, incomes, admin, incomes
+from .routers import reservations, expenses, apartments, incomes, admin, incomes, public
 
 # Dashboard
 from .dashboard_api import router as dashboard_router
@@ -108,7 +108,30 @@ def db_status():
 
 @app.get("/")
 def root():
-    return RedirectResponse(url="/dashboard")
+    return {
+        "message": "🏠 SES.GASTOS - Sistema de Gestión de Gastos para Apartamentos",
+        "version": "2.0.0",
+        "features": [
+            "🤖 Bot de Telegram con IA",
+            "📸 OCR automático de facturas",
+            "📊 Dashboard web interactivo",
+            "💰 Gestión completa de gastos e ingresos"
+        ],
+        "links": {
+            "register_apartment": "/public/register",
+            "admin_panel": "/admin/apartments",
+            "dashboard": "/api/v1/dashboard/",
+            "api_docs": "/docs",
+            "health": "/health"
+        },
+        "telegram_bot": "@UriApartment_Bot",
+        "instructions": [
+            "1. Registra tu apartamento en /public/register",
+            "2. Busca @UriApartment_Bot en Telegram",
+            "3. Usa /usar CODIGO para configurar",
+            "4. Envía fotos de facturas para procesamiento automático"
+        ]
+    }
 
 @app.get("/dashboard")
 def dashboard_redirect():
@@ -120,6 +143,7 @@ app.include_router(expenses.router)
 app.include_router(apartments.router)
 app.include_router(incomes.router)   # <= IMPORTANTE
 app.include_router(admin.router)
+app.include_router(public.router)
 app.include_router(dashboard_router)
 app.include_router(vectors.router)
 app.include_router(webhook_router)

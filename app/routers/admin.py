@@ -1,9 +1,14 @@
-﻿# app/routers/admin.py
+# app/routers/admin.py
 from __future__ import annotations
 import os
-from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi import APIRouter, HTTPException, Header, Query, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import text, inspect
 from ..db import engine
+
+# Initialize templates
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "..", "templates"))
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -248,3 +253,8 @@ async def exec_sql(
                 errors.append(f"{s} -- {e}")
 
     return {"ok": True, "executed": executed, "errors": errors}
+
+@router.get("/apartments", response_class=HTMLResponse)
+def admin_apartments_page(request: Request):
+    """Panel de administración de apartamentos"""
+    return templates.TemplateResponse("admin_apartments.html", {"request": request})
