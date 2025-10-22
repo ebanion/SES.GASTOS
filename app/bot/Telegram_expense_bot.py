@@ -64,12 +64,18 @@ logger = logging.getLogger("expense_bot")
 # Commands
 # ---------------------------------------------------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = update.effective_user.first_name or "Usuario"
     await update.message.reply_text(
-        "Hola! Envíame un PDF de un gasto y lo registraré automáticamente.\n"
-        "Antes, dime el código del apartamento con /usar <codigo>\n\n"
-        "Ejemplo: /usar SES01\n"
-        "Consulta el activo con /actual\n"
-        "Para olvidar el apartamento activo: /reset"
+        f"¡Hola {user_name}! 👋\n\n"
+        "🤖 Soy el bot de SES.GASTOS. Puedo procesar automáticamente tus facturas y registrar gastos.\n\n"
+        "📋 **Pasos para empezar:**\n"
+        "1️⃣ Configura tu apartamento: /usar SES01\n"
+        "2️⃣ Envía una foto 📸 o PDF 📄 de tu factura\n"
+        "3️⃣ ¡Listo! El gasto se registra automáticamente\n\n"
+        "🔧 **Comandos útiles:**\n"
+        "• /actual - Ver apartamento configurado\n"
+        "• /reset - Cambiar de apartamento\n\n"
+        "💡 **Tip:** Asegúrate de que las fotos sean claras y legibles para mejores resultados."
     )
 
 async def usar_apartamento(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -197,22 +203,72 @@ def _infer_category(expense: dict) -> str:
 # ---------------------------------------------------------------------
 # PDF handler
 # ---------------------------------------------------------------------
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle photo messages (facturas en imagen)"""
+    user_id = update.effective_user.id
+    
+    try:
+        # 1) Necesitamos apartamento activo
+        ctx = dialog_context.get(user_id, {})
+        base_code = ctx.get("apartment_code")
+        base_id = ctx.get("apartment_id")
+        if not base_code or not base_id:
+            await update.message.reply_text("❌ Primero indica el código del apartamento con /usar <codigo>\n\nEjemplo: /usar SES01")
+            return
+
+        await update.message.reply_text("📸 Procesando imagen de factura...")
+        
+        # 2) Obtener la foto de mayor resolución
+        photo = update.message.photo[-1]  # La última es la de mayor resolución
+        file = await photo.get_file()
+        
+        # 3) Descargar a archivo temporal
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+            await file.download_to_drive(tmp_path)
+        
+        # 4) Extraer texto usando OCR
+        from Ocr_untils import extract_text_from_image
+        texto_extraido = extract_text_from_image(tmp_path)
+        
+        if not texto_extraido or len(texto_extraido.strip()) < 10:
+            await update.message.reply_text("❌ No pude extraer texto de la imagen. Asegúrate de que la foto sea clara y legible.")
+            return
+        
+        # 5) Procesar con IA
+        await _process_expense_text(update, user_id, base_code, base_id, texto_extraido, "foto")
+        
+    except Exception as e:
+        logger.error(f"Error procesando foto: {e}")
+        await update.message.reply_text(f"❌ Error procesando la imagen: {str(e)}")
+    finally:
+        # Limpiar archivo temporal
+        try:
+            if 'tmp_path' in locals():
+                os.unlink(tmp_path)
+        except:
+            pass
+
 async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    # 1) Necesitamos apartamento activo
-    ctx = dialog_context.get(user_id, {})
-    base_code = ctx.get("apartment_code")
-    base_id = ctx.get("apartment_id")
-    if not base_code or not base_id:
-        await update.message.reply_text("Primero indica el código del apartamento con /usar <codigo>")
-        return
+    try:
+        # 1) Necesitamos apartamento activo
+        ctx = dialog_context.get(user_id, {})
+        base_code = ctx.get("apartment_code")
+        base_id = ctx.get("apartment_id")
+        if not base_code or not base_id:
+            await update.message.reply_text("❌ Primero indica el código del apartamento con /usar <codigo>\n\nEjemplo: /usar SES01")
+            return
 
-    # 2) Verificar que es PDF
-    doc = update.message.document
-    if not doc or (not (doc.file_name or "").lower().endswith(".pdf") and (doc.mime_type or "") != "application/pdf"):
-        await update.message.reply_text("Solo acepto archivos PDF.")
-        return
+        # 2) Verificar que es PDF
+        doc = update.message.document
+        if not doc or (not (doc.file_name or "").lower().endswith(".pdf") and (doc.mime_type or "") != "application/pdf"):
+            await update.message.reply_text("❌ Solo acepto archivos PDF.")
+            return
+        
+        await update.message.reply_text("📄 Procesando PDF de factura...")
 
     # 3) Descargar a archivo temporal
     file = await doc.get_file()
@@ -317,6 +373,62 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ---------------------------------------------------------------------
+async def handle_unknown_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle unknown text messages"""
+    await update.message.reply_text(
+        "🤔 No entiendo ese mensaje.\n\n"
+        "📋 Comandos disponibles:\n"
+        "• /start - Iniciar\n"
+        "• /usar <codigo> - Configurar apartamento (ej: /usar SES01)\n"
+        "• /actual - Ver apartamento actual\n"
+        "• /reset - Resetear apartamento\n\n"
+        "📸 O envía una foto/PDF de una factura para procesarla automáticamente."
+    )
+
+async def _process_expense_text(update, user_id, base_code, base_id, texto_extraido, source_type):
+    """Función común para procesar texto extraído de facturas"""
+    try:
+        logger.info(f"Texto extraído (primeros 200 chars): {texto_extraido[:200]}")
+
+        # 1) Llamar al LLM
+        expense_json = extract_expense_json(texto_extraido)
+        if not expense_json:
+            await update.message.reply_text("❌ No pude extraer datos de gasto del texto.")
+            return
+
+        logger.info(f"JSON extraído: {expense_json}")
+
+        # 2) Normalizar
+        expense_json["apartment_id"] = base_id
+        expense_json["source"] = f"telegram_bot_{source_type.lower()}"
+
+        # 3) Enviar al backend
+        response = send_expense_to_backend(expense_json, API_BASE_URL, INTERNAL_KEY)
+        if response.get("success"):
+            expense_id = response.get("expense_id", "?")
+            
+            # Mensaje de éxito con detalles
+            details = []
+            if expense_json.get("date"):
+                details.append(f"📅 Fecha: {expense_json['date']}")
+            if expense_json.get("amount_gross"):
+                details.append(f"💰 Importe: €{expense_json['amount_gross']}")
+            if expense_json.get("vendor"):
+                details.append(f"🏪 Proveedor: {expense_json['vendor']}")
+            if expense_json.get("category"):
+                details.append(f"📂 Categoría: {expense_json['category']}")
+            details.append(f"🏠 Apartamento: {base_code}")
+            
+            success_msg = f"✅ Factura procesada correctamente!\n\n" + "\n".join(details) + f"\n\n🆔 ID: {expense_id}"
+            await update.message.reply_text(success_msg)
+        else:
+            error_msg = response.get("error", "Error desconocido")
+            await update.message.reply_text(f"❌ Error guardando gasto: {error_msg}")
+
+    except Exception as e:
+        logger.error(f"Error procesando texto de {source_type}: {e}")
+        await update.message.reply_text(f"❌ Error procesando {source_type}: {str(e)}")
+
 # Main
 # ---------------------------------------------------------------------
 def main():
@@ -327,17 +439,35 @@ def main():
         logger.warning("INTERNAL_KEY vacío: el backend devolverá 403. Configúralo en .env")
 
     logger.info(f"API_BASE_URL: {API_BASE_URL}")
+    logger.info(f"TELEGRAM_TOKEN configurado: {'Sí' if TELEGRAM_TOKEN else 'No'}")
+    logger.info(f"OPENAI_API_KEY configurado: {'Sí' if os.getenv('OPENAI_API_KEY') else 'No'}")
 
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
+    # Agregar handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("usar", usar_apartamento))
     app.add_handler(CommandHandler("actual", actual))
     app.add_handler(CommandHandler("reset", reset_apartamento))
     app.add_handler(MessageHandler(filters.Document.PDF, handle_pdf))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    
+    # Handler para mensajes no reconocidos
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unknown_message))
 
-    logger.info("Bot iniciado y escuchando...")
-    app.run_polling()
+    logger.info("🤖 Bot iniciado y escuchando...")
+    logger.info("📋 Comandos disponibles:")
+    logger.info("   /start - Iniciar bot")
+    logger.info("   /usar <codigo> - Configurar apartamento")
+    logger.info("   /actual - Ver apartamento actual")
+    logger.info("   /reset - Resetear apartamento")
+    logger.info("📸 Envía fotos o PDFs de facturas para procesarlas")
+    
+    try:
+        app.run_polling()
+    except Exception as e:
+        logger.error(f"Error ejecutando bot: {e}")
+        raise
 
 
 if __name__ == "__main__":
