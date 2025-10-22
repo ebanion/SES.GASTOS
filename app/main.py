@@ -324,6 +324,7 @@ def setup_webhook():
     """Configurar webhook de Telegram"""
     try:
         import requests
+        import os
         token = os.getenv("TELEGRAM_TOKEN")
         if not token:
             return {"success": False, "error": "TELEGRAM_TOKEN no configurado"}
