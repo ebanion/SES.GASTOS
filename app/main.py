@@ -17,6 +17,9 @@ from .dashboard_api import router as dashboard_router
 # Vectors
 from .routers import vectors
 
+# Webhook Bot
+from .webhook_bot import webhook_router
+
 
 
 app = FastAPI(title="SES.GASTOS")
@@ -82,6 +85,7 @@ app.include_router(incomes.router)   # <= IMPORTANTE
 app.include_router(admin.router)
 app.include_router(dashboard_router)
 app.include_router(vectors.router)
+app.include_router(webhook_router)
 
 # Pequeño debug para ver rutas en producción si hace falta
 @app.get("/debug/routes")
@@ -314,3 +318,37 @@ def init_demo_data():
         return {"success": False, "error": str(e)}
     finally:
         db.close()
+
+@app.post("/bot/setup-webhook")
+def setup_webhook():
+    """Configurar webhook de Telegram"""
+    try:
+        import requests
+        token = os.getenv("TELEGRAM_TOKEN")
+        if not token:
+            return {"success": False, "error": "TELEGRAM_TOKEN no configurado"}
+        
+        webhook_url = f"https://ses-gastos.onrender.com/webhook/telegram"
+        
+        # Configurar webhook
+        response = requests.post(
+            f"https://api.telegram.org/bot{token}/setWebhook",
+            json={"url": webhook_url},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return {
+                "success": True,
+                "message": "Webhook configurado correctamente",
+                "webhook_url": webhook_url,
+                "telegram_response": result
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Error configurando webhook: {response.text}"
+            }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
