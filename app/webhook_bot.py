@@ -83,31 +83,51 @@ async def usar_apartamento(update: Update, context):
     
     apartment_code = context.args[0].upper()
     
-    # Verificar apartamento
+    # Verificar apartamento usando httpx asíncrono
     try:
-        import requests
-        response = requests.get(f"{API_BASE_URL}/api/v1/apartments/", timeout=10)
-        if response.status_code == 200:
-            apartments = response.json()
-            apartment = next((apt for apt in apartments if apt['code'] == apartment_code), None)
+        import httpx
+        import asyncio
+        
+        # Usar httpx asíncrono con timeout más largo
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{API_BASE_URL}/api/v1/apartments/")
             
-            if apartment:
-                user_sessions[user_id] = {
-                    "apartment_code": apartment_code,
-                    "apartment_id": apartment['id']
-                }
-                await update.message.reply_text(
-                    f"✅ Apartamento configurado: **{apartment_code}**\n\n"
-                    f"Ahora envía una foto de factura 📸"
-                )
+            if response.status_code == 200:
+                apartments = response.json()
+                apartment = next((apt for apt in apartments if apt['code'] == apartment_code), None)
+                
+                if apartment:
+                    user_sessions[user_id] = {
+                        "apartment_code": apartment_code,
+                        "apartment_id": apartment['id']
+                    }
+                    await update.message.reply_text(
+                        f"✅ Apartamento configurado: **{apartment_code}**\n\n"
+                        f"Ahora envía una foto de factura 📸"
+                    )
+                else:
+                    codes = [apt['code'] for apt in apartments]
+                    await update.message.reply_text(
+                        f"❌ Apartamento '{apartment_code}' no encontrado.\n\n"
+                        f"Disponibles: {', '.join(codes)}"
+                    )
             else:
-                codes = [apt['code'] for apt in apartments]
                 await update.message.reply_text(
-                    f"❌ Apartamento '{apartment_code}' no encontrado.\n\n"
-                    f"Disponibles: {', '.join(codes)}"
+                    f"❌ Error del servidor: HTTP {response.status_code}\n"
+                    f"Intenta de nuevo en unos segundos."
                 )
+                
+    except httpx.TimeoutException:
+        await update.message.reply_text(
+            f"⏰ Timeout conectando con el servidor.\n"
+            f"El servidor puede estar ocupado. Intenta de nuevo."
+        )
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+        logger.error(f"Error en comando /usar: {e}")
+        await update.message.reply_text(
+            f"❌ Error técnico: {str(e)}\n"
+            f"Intenta de nuevo o contacta soporte."
+        )
 
 async def actual(update: Update, context):
     """Comando /actual"""
@@ -128,22 +148,36 @@ async def reset_apartamento(update: Update, context):
 async def status_command(update: Update, context):
     """Comando /status"""
     try:
-        import requests
-        response = requests.get(f"{API_BASE_URL}/api/v1/apartments/", timeout=10)
-        if response.status_code == 200:
-            apartments = response.json()
-            codes = [apt['code'] for apt in apartments]
-            await update.message.reply_text(
-                f"📊 **Sistema Operativo**\n\n"
-                f"✅ API: Funcionando\n"
-                f"✅ Apartamentos: {len(apartments)}\n"
-                f"📋 Códigos: {', '.join(codes)}\n\n"
-                f"🌐 Dashboard: {API_BASE_URL}/api/v1/dashboard/"
-            )
-        else:
-            await update.message.reply_text("❌ Error conectando con API")
+        import httpx
+        
+        # Usar httpx asíncrono con timeout más largo
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{API_BASE_URL}/api/v1/apartments/")
+            
+            if response.status_code == 200:
+                apartments = response.json()
+                codes = [apt['code'] for apt in apartments]
+                await update.message.reply_text(
+                    f"📊 **Sistema Operativo**\n\n"
+                    f"✅ API: Funcionando\n"
+                    f"✅ Apartamentos: {len(apartments)}\n"
+                    f"📋 Códigos: {', '.join(codes)}\n\n"
+                    f"🌐 Dashboard: {API_BASE_URL}/api/v1/dashboard/"
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ Error del servidor: HTTP {response.status_code}\n"
+                    f"Intenta de nuevo en unos segundos."
+                )
+                
+    except httpx.TimeoutException:
+        await update.message.reply_text(
+            f"⏰ Timeout conectando con el servidor.\n"
+            f"El servidor puede estar ocupado. Intenta de nuevo."
+        )
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+        logger.error(f"Error en comando /status: {e}")
+        await update.message.reply_text(f"❌ Error técnico: {str(e)}")
 
 async def handle_photo(update: Update, context):
     """Manejar fotos - modo manual"""
@@ -191,27 +225,55 @@ async def handle_text(update: Update, context):
                 "source": "telegram_webhook_manual"
             }
             
-            # Crear gasto
-            import requests
-            headers = {"Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY}
-            response = requests.post(f"{API_BASE_URL}/api/v1/expenses/", json=expense_data, headers=headers, timeout=10)
+            # Crear gasto usando httpx asíncrono
+            import httpx
             
-            if response.status_code in [200, 201]:
-                result = response.json()
-                await update.message.reply_text(
-                    f"✅ **¡Gasto registrado!**\n\n"
-                    f"📅 {expense_data['date']}\n"
-                    f"💰 €{expense_data['amount_gross']}\n"
-                    f"🏪 {expense_data['vendor']}\n"
-                    f"📂 {expense_data['category']}\n"
-                    f"🏠 {session['apartment_code']}\n\n"
-                    f"🆔 ID: {result.get('expense_id', 'N/A')}\n\n"
-                    f"🌐 Ver en: {API_BASE_URL}/api/v1/dashboard/"
+            headers = {"Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY}
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{API_BASE_URL}/api/v1/expenses/", 
+                    json=expense_data, 
+                    headers=headers
                 )
-            else:
-                await update.message.reply_text(f"❌ Error: {response.status_code} - {response.text}")
+                
+                if response.status_code in [200, 201]:
+                    result = response.json()
+                    await update.message.reply_text(
+                        f"✅ **¡Gasto registrado!**\n\n"
+                        f"📅 {expense_data['date']}\n"
+                        f"💰 €{expense_data['amount_gross']}\n"
+                        f"🏪 {expense_data['vendor']}\n"
+                        f"📂 {expense_data['category']}\n"
+                        f"🏠 {session['apartment_code']}\n\n"
+                        f"🆔 ID: {result.get('expense_id', 'N/A')}\n\n"
+                        f"🌐 Ver en: {API_BASE_URL}/api/v1/dashboard/"
+                    )
+                else:
+                    await update.message.reply_text(
+                        f"❌ Error del servidor: HTTP {response.status_code}\n"
+                        f"Detalles: {response.text[:200]}\n"
+                        f"Intenta de nuevo."
+                    )
+                    
+        except httpx.TimeoutException:
+            await update.message.reply_text(
+                f"⏰ Timeout creando el gasto.\n"
+                f"El servidor puede estar ocupado. Intenta de nuevo."
+            )
+        except ValueError as e:
+            await update.message.reply_text(
+                f"❌ Error en el formato de datos.\n"
+                f"Asegúrate de usar el formato correcto:\n"
+                f"Fecha (YYYY-MM-DD)\n"
+                f"Importe (número)\n"
+                f"Proveedor\n"
+                f"Categoría\n"
+                f"Descripción (opcional)"
+            )
         except Exception as e:
-            await update.message.reply_text(f"❌ Error procesando datos: {str(e)}")
+            logger.error(f"Error creando gasto: {e}")
+            await update.message.reply_text(f"❌ Error técnico: {str(e)}")
     else:
         await update.message.reply_text(
             f"📝 **Formato incorrecto**\n\n"
