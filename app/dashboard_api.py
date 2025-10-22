@@ -60,7 +60,7 @@ def dashboard_monthly(
         func.extract("year", models.Expense.date) == year
     ]
     res_filter = [
-        func.extract("year", models.Reservation.checkin_date) == year
+        func.extract("year", models.Reservation.check_in) == year
     ]
     inc_filter = [
         func.extract("year", models.Income.date) == year
@@ -83,25 +83,25 @@ def dashboard_monthly(
     )
     expenses_map = {int(row.m): _f(row.total_exp) for row in expenses_q}
 
-    # RESERVATIONS (contadores por status por mes de check-in)
+    # RESERVATIONS (contadores totales por mes de check-in)
     res_q = (
         db.query(
-            func.extract("month", models.Reservation.checkin_date).label("m"),
-            func.coalesce(func.sum(case((models.Reservation.status == "ACCEPTED", 1), else_=0)), 0).label("acc"),
-            func.coalesce(func.sum(case((models.Reservation.status == "PENDING", 1), else_=0)), 0).label("pen"),
+            func.extract("month", models.Reservation.check_in).label("m"),
+            func.coalesce(func.count(models.Reservation.id), 0).label("total"),
         )
         .filter(and_(*res_filter))
         .group_by("m")
         .all()
     )
-    res_acc_map = {int(row.m): _i(row.acc) for row in res_q}
-    res_pen_map = {int(row.m): _i(row.pen) for row in res_q}
+    res_total_map = {int(row.m): _i(row.total) for row in res_q}
+    res_acc_map = res_total_map  # Por ahora, todas las reservas se consideran confirmadas
+    res_pen_map = {m: 0 for m in range(1, 13)}  # Sin reservas pendientes por ahora
 
     # INCOMES (suma por status por mes)
     inc_q = (
         db.query(
             func.extract("month", models.Income.date).label("m"),
-            func.coalesce(func.sum(case((models.Income.status == "ACCEPTED", models.Income.amount), else_=0)), 0).label("inc_acc"),
+            func.coalesce(func.sum(case((models.Income.status == "CONFIRMED", models.Income.amount), else_=0)), 0).label("inc_acc"),
             func.coalesce(func.sum(case((models.Income.status == "PENDING",  models.Income.amount), else_=0)), 0).label("inc_pen"),
         )
         .filter(and_(*inc_filter))
