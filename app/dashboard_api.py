@@ -25,7 +25,8 @@ def dashboard_health(db: Session = Depends(get_db)):
     """Dashboard health check with database connectivity"""
     try:
         # Test database connection
-        db.execute("SELECT 1")
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
         
         # Test if main tables exist
         tables_exist = {}
@@ -33,7 +34,7 @@ def dashboard_health(db: Session = Depends(get_db)):
         
         for table in ["apartments", "expenses", "incomes", "reservations"]:
             try:
-                count = db.execute(f"SELECT COUNT(*) FROM {table}").scalar()
+                count = db.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
                 tables_exist[table] = True
                 table_counts[table] = count
             except Exception as e:

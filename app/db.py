@@ -56,8 +56,9 @@ connect_args = {}
 try:
     engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
     # Test connection
+    from sqlalchemy import text
     with engine.connect() as conn:
-        conn.execute("SELECT 1")
+        conn.execute(text("SELECT 1"))
     print("[DB] ✅ Database connection successful")
 except Exception as e:
     print(f"[DB] ❌ Database connection failed: {e}")
