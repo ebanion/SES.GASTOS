@@ -133,9 +133,48 @@ def restart_bot():
         from .telegram_bot_service import telegram_service
         telegram_service.stop_bot()
         import time
-        time.sleep(2)  # Esperar un poco antes de reiniciar
+        time.sleep(3)  # Esperar más tiempo antes de reiniciar
         telegram_service.start_bot_in_thread()
-        return {"success": True, "message": "Bot reiniciado"}
+        return {"success": True, "message": "Bot reiniciado con versión de producción"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/bot/test-simple")
+def test_simple_bot():
+    """Probar bot simple sin iniciar hilo"""
+    try:
+        import os
+        token = os.getenv("TELEGRAM_TOKEN")
+        if not token:
+            return {"success": False, "error": "TELEGRAM_TOKEN no configurado"}
+        
+        # Probar conexión básica con Telegram API
+        import requests
+        response = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10)
+        
+        if response.status_code == 200:
+            bot_info = response.json()["result"]
+            return {
+                "success": True, 
+                "bot_info": {
+                    "username": bot_info.get("username"),
+                    "first_name": bot_info.get("first_name"),
+                    "id": bot_info.get("id")
+                },
+                "message": f"✅ Bot @{bot_info.get('username')} conectado correctamente",
+                "instructions": [
+                    f"1. Busca @{bot_info.get('username')} en Telegram",
+                    "2. Envía /start",
+                    "3. Envía /usar SES01", 
+                    "4. Envía foto de factura o datos manuales",
+                    "5. Ve el resultado en el dashboard"
+                ]
+            }
+        else:
+            return {
+                "success": False, 
+                "error": f"Error HTTP {response.status_code}: {response.text}"
+            }
     except Exception as e:
         return {"success": False, "error": str(e)}
 

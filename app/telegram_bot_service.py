@@ -54,15 +54,25 @@ class TelegramBotService:
             try:
                 logger.info("🤖 Iniciando bot de Telegram...")
                 
-                # Importar y ejecutar el bot
+                # Importar y ejecutar el bot de producción
                 try:
-                    from .bot.Telegram_expense_bot import main as bot_main
-                    bot_main()
+                    # Usar bot optimizado para producción
+                    from .production_bot import main as production_bot_main
+                    logger.info("🚀 Usando bot de producción optimizado")
+                    production_bot_main()
                 except ImportError as e:
-                    logger.warning(f"No se pudo importar bot completo: {e}")
-                    # Fallback a bot simple
-                    from .simple_bot_test import main as simple_bot_main
-                    simple_bot_main()
+                    logger.warning(f"No se pudo importar bot de producción: {e}")
+                    try:
+                        # Fallback al bot completo
+                        from .bot.Telegram_expense_bot import main as bot_main
+                        logger.info("🔄 Fallback al bot completo")
+                        bot_main()
+                    except ImportError as e2:
+                        logger.warning(f"No se pudo importar bot completo: {e2}")
+                        # Último fallback al bot simple
+                        from .simple_bot_test import main as simple_bot_main
+                        logger.info("🔄 Fallback al bot simple")
+                        simple_bot_main()
                 
             except Exception as e:
                 logger.error(f"❌ Error ejecutando bot: {e}")
