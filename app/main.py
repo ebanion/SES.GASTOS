@@ -321,36 +321,178 @@ def init_demo_data():
         db.close()
 
 @app.post("/bot/setup-webhook")
-def setup_webhook():
+async def setup_webhook():
     """Configurar webhook de Telegram"""
     try:
-        import requests
+        # Usar el endpoint del webhook_bot
+        from .webhook_bot import ensure_telegram_app_initialized
         import os
+        
         token = os.getenv("TELEGRAM_TOKEN")
         if not token:
             return {"success": False, "error": "TELEGRAM_TOKEN no configurado"}
         
+        # Inicializar la aplicación de Telegram si no está inicializada
+        app = await ensure_telegram_app_initialized()
+        if not app:
+            return {"success": False, "error": "No se pudo inicializar el bot"}
+        
         webhook_url = f"https://ses-gastos.onrender.com/webhook/telegram"
         
-        # Configurar webhook
-        response = requests.post(
-            f"https://api.telegram.org/bot{token}/setWebhook",
-            json={"url": webhook_url},
-            timeout=10
-        )
+        # Configurar webhook usando la aplicación de Telegram
+        success = await app.bot.set_webhook(url=webhook_url)
         
-        if response.status_code == 200:
-            result = response.json()
+        if success:
+            webhook_info = await app.bot.get_webhook_info()
             return {
                 "success": True,
                 "message": "Webhook configurado correctamente",
                 "webhook_url": webhook_url,
-                "telegram_response": result
+                "webhook_info": {
+                    "url": webhook_info.url,
+                    "pending_updates": webhook_info.pending_update_count
+                }
             }
         else:
-            return {
-                "success": False,
-                "error": f"Error configurando webhook: {response.text}"
-            }
+            return {"success": False, "error": "No se pudo configurar el webhook"}
+            
     except Exception as e:
+        import traceback
+        print(f"Error configurando webhook: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
         return {"success": False, "error": str(e)}
+
+@app.get("/bot/webhook-status")
+async def webhook_status():
+    """Verificar estado del webhook de Telegram"""
+    try:
+        from .webhook_bot import ensure_telegram_app_initialized
+        import os
+        
+        token = os.getenv("TELEGRAM_TOKEN")
+        if not token:
+            return {"success": False, "error": "TELEGRAM_TOKEN no configurado"}
+        
+        app = await ensure_telegram_app_initialized()
+        if not app:
+            return {"success": False, "error": "Bot no inicializado"}
+        
+        # Obtener información del webhook
+        webhook_info = await app.bot.get_webhook_info()
+        bot_info = await app.bot.get_me()
+        
+        return {
+            "success": True,
+            "bot": {
+                "username": bot_info.username,
+                "first_name": bot_info.first_name,
+                "id": bot_info.id
+            },
+            "webhook": {
+                "url": webhook_info.url,
+                "has_custom_certificate": webhook_info.has_custom_certificate,
+                "pending_update_count": webhook_info.pending_update_count,
+                "last_error_date": webhook_info.last_error_date.isoformat() if webhook_info.last_error_date else None,
+                "last_error_message": webhook_info.last_error_message,
+                "max_connections": webhook_info.max_connections
+            },
+            "status": "configured" if webhook_info.url else "not_configured"
+        }
+    except Exception as e:
+        import traceback
+        print(f"Error verificando webhook: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/bot/diagnose")
+async def diagnose_bot():
+    """Diagnóstico completo del bot de Telegram"""
+    try:
+        import os
+        from .webhook_bot import ensure_telegram_app_initialized
+        
+        diagnosis = {
+            "environment": {},
+            "initialization": {},
+            "webhook": {},
+            "recommendations": []
+        }
+        
+        # 1. Verificar variables de entorno
+        telegram_token = os.getenv("TELEGRAM_TOKEN")
+        openai_key = os.getenv("OPENAI_API_KEY")
+        admin_key = os.getenv("ADMIN_KEY") or os.getenv("INTERNAL_KEY")
+        api_base_url = os.getenv("API_BASE_URL", "https://ses-gastos.onrender.com")
+        
+        diagnosis["environment"] = {
+            "telegram_token": "✅ Configurado" if telegram_token else "❌ Faltante",
+            "openai_key": "✅ Configurado" if openai_key else "❌ Faltante",
+            "admin_key": "✅ Configurado" if admin_key else "❌ Faltante",
+            "api_base_url": api_base_url,
+            "telegram_token_preview": f"...{telegram_token[-4:]}" if telegram_token else None
+        }
+        
+        if not telegram_token:
+            diagnosis["recommendations"].append("Configurar TELEGRAM_TOKEN en las variables de entorno")
+            return diagnosis
+        
+        # 2. Probar inicialización
+        try:
+            app = await ensure_telegram_app_initialized()
+            if app:
+                diagnosis["initialization"]["status"] = "✅ Exitosa"
+                
+                # Obtener info del bot
+                bot_info = await app.bot.get_me()
+                diagnosis["initialization"]["bot_info"] = {
+                    "username": bot_info.username,
+                    "first_name": bot_info.first_name,
+                    "id": bot_info.id
+                }
+                
+                # 3. Verificar webhook
+                webhook_info = await app.bot.get_webhook_info()
+                diagnosis["webhook"] = {
+                    "url": webhook_info.url or "No configurado",
+                    "pending_updates": webhook_info.pending_update_count,
+                    "last_error_date": webhook_info.last_error_date.isoformat() if webhook_info.last_error_date else None,
+                    "last_error_message": webhook_info.last_error_message,
+                    "status": "✅ Configurado" if webhook_info.url else "⚠️ No configurado"
+                }
+                
+                # Recomendaciones
+                if not webhook_info.url:
+                    diagnosis["recommendations"].append("Configurar webhook usando /bot/setup-webhook")
+                
+                if webhook_info.pending_update_count > 0:
+                    diagnosis["recommendations"].append(f"Hay {webhook_info.pending_update_count} updates pendientes")
+                
+                if webhook_info.last_error_message:
+                    diagnosis["recommendations"].append(f"Último error del webhook: {webhook_info.last_error_message}")
+                
+                if not admin_key:
+                    diagnosis["recommendations"].append("Configurar ADMIN_KEY para autenticación de API")
+                
+            else:
+                diagnosis["initialization"]["status"] = "❌ Falló"
+                diagnosis["recommendations"].append("La inicialización del bot falló")
+                
+        except Exception as init_error:
+            diagnosis["initialization"]["status"] = f"❌ Error: {str(init_error)}"
+            diagnosis["recommendations"].append(f"Error de inicialización: {str(init_error)}")
+        
+        # Estado general
+        if not diagnosis["recommendations"]:
+            diagnosis["overall_status"] = "✅ Todo funcionando correctamente"
+        else:
+            diagnosis["overall_status"] = f"⚠️ {len(diagnosis['recommendations'])} problemas encontrados"
+        
+        return diagnosis
+        
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
