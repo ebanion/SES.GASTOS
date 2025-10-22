@@ -55,8 +55,14 @@ class TelegramBotService:
                 logger.info("🤖 Iniciando bot de Telegram...")
                 
                 # Importar y ejecutar el bot
-                from .bot.Telegram_expense_bot import main as bot_main
-                bot_main()
+                try:
+                    from .bot.Telegram_expense_bot import main as bot_main
+                    bot_main()
+                except ImportError as e:
+                    logger.warning(f"No se pudo importar bot completo: {e}")
+                    # Fallback a bot simple
+                    from .simple_bot_test import main as simple_bot_main
+                    simple_bot_main()
                 
             except Exception as e:
                 logger.error(f"❌ Error ejecutando bot: {e}")
