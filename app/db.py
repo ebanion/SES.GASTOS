@@ -52,7 +52,19 @@ except Exception as e:
 # Crear engine (solo psycopg v3)
 # ------------------------------------------------------------
 connect_args = {}
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
+
+try:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
+    # Test connection
+    with engine.connect() as conn:
+        conn.execute("SELECT 1")
+    print("[DB] ✅ Database connection successful")
+except Exception as e:
+    print(f"[DB] ❌ Database connection failed: {e}")
+    print(f"[DB] 🔄 Falling back to SQLite for development")
+    # Fallback to SQLite if PostgreSQL fails
+    DATABASE_URL = "sqlite:///fallback.db"
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

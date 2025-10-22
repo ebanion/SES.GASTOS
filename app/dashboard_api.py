@@ -28,24 +28,42 @@ def dashboard_health(db: Session = Depends(get_db)):
         db.execute("SELECT 1")
         
         # Test if main tables exist
-        tables_exist = {
-            "apartments": db.execute("SELECT COUNT(*) FROM apartments").scalar() >= 0,
-            "expenses": db.execute("SELECT COUNT(*) FROM expenses").scalar() >= 0,
-            "incomes": db.execute("SELECT COUNT(*) FROM incomes").scalar() >= 0,
-            "reservations": db.execute("SELECT COUNT(*) FROM reservations").scalar() >= 0,
-        }
+        tables_exist = {}
+        table_counts = {}
+        
+        for table in ["apartments", "expenses", "incomes", "reservations"]:
+            try:
+                count = db.execute(f"SELECT COUNT(*) FROM {table}").scalar()
+                tables_exist[table] = True
+                table_counts[table] = count
+            except Exception as e:
+                tables_exist[table] = False
+                table_counts[table] = f"Error: {str(e)}"
+        
+        # Get database URL info (masked)
+        import re
+        from app.db import DATABASE_URL
+        masked_url = re.sub(r"://([^:@]+):[^@]+@", r"://\1:***@", DATABASE_URL)
         
         return {
             "status": "healthy",
             "database": "connected",
+            "database_url": masked_url,
             "tables": tables_exist,
+            "table_counts": table_counts,
             "templates_path": os.path.join(os.path.dirname(__file__), "templates")
         }
     except Exception as e:
+        import re
+        from app.db import DATABASE_URL
+        masked_url = re.sub(r"://([^:@]+):[^@]+@", r"://\1:***@", DATABASE_URL)
+        
         return {
             "status": "unhealthy",
             "error": str(e),
-            "database": "disconnected"
+            "database": "disconnected",
+            "database_url": masked_url,
+            "suggestion": "Check DATABASE_URL environment variable in Render dashboard"
         }
 
 def _f(x) -> float:
@@ -172,10 +190,25 @@ def dashboard_monthly(
 def dashboard_page(request: Request):
     """Serve the dashboard HTML page"""
     try:
-        return templates.TemplateResponse("dashboard.html", {"request": request})
+        return templates.TemplateResponse("dashboard.html", {
+            "request": request,
+            "db_error": None
+        })
     except Exception as e:
         print(f"Error loading dashboard template: {e}")
-        raise HTTPException(status_code=404, detail=f"Dashboard template not found: {str(e)}")
+        # Try to return a simple error page instead of failing completely
+        error_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>SES.GASTOS - Error</title></head>
+        <body>
+            <h1>Dashboard Error</h1>
+            <p>Error loading dashboard: {str(e)}</p>
+            <p><a href="/api/v1/dashboard/health">Check System Health</a></p>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=error_html, status_code=500)
 
 @router.get("/content", response_class=HTMLResponse)
 def dashboard_content(

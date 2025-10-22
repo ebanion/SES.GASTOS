@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SES.GASTOS - Error de Base de Datos</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .error-container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .error-title {
+            color: #ef4444;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #991b1b;
+        }
+        .solution {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #0c4a6e;
+        }
+        .button {
+            display: inline-block;
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1 class="error-title">🚨 Error de Conexión a Base de Datos</h1>
+        
+        <div class="error-message">
+            <strong>Error:</strong> No se puede conectar a la base de datos PostgreSQL.
+            <br><br>
+            <strong>Causa probable:</strong> Las credenciales de la base de datos han cambiado o son incorrectas.
+        </div>
+
+        <div class="solution">
+            <h3>🔧 Solución:</h3>
+            <ol>
+                <li>Ve al <strong>Dashboard de Render</strong></li>
+                <li>Busca tu <strong>base de datos PostgreSQL</strong></li>
+                <li>Copia la nueva <strong>DATABASE_URL</strong></li>
+                <li>Ve a tu <strong>servicio web</strong> en Render</li>
+                <li>Actualiza la variable de entorno <strong>DATABASE_URL</strong></li>
+                <li>Redeploy el servicio</li>
+            </ol>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="/api/v1/dashboard/health" class="button">🔍 Diagnóstico Completo</a>
+            <a href="/db-status" class="button">📊 Estado de BD</a>
+            <a href="/" class="button">🏠 Volver al Inicio</a>
+        </div>
+
+        <div style="margin-top: 30px; padding: 15px; background: #f9fafb; border-radius: 5px; font-size: 14px; color: #6b7280;">
+            <strong>Nota técnica:</strong> La aplicación está funcionando, solo necesita reconectarse a la base de datos con las credenciales correctas.
+        </div>
+    </div>
+</body>
+</html>

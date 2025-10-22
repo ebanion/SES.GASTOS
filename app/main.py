@@ -37,6 +37,17 @@ def on_startup() -> None:
 def health():
     return {"ok": True}
 
+@app.get("/db-status")
+def db_status():
+    """Check database connection status"""
+    try:
+        from app.db import engine
+        with engine.connect() as conn:
+            conn.execute("SELECT 1")
+        return {"database": "connected", "status": "ok"}
+    except Exception as e:
+        return {"database": "disconnected", "error": str(e), "status": "error"}
+
 @app.get("/")
 def root():
     return RedirectResponse(url="/dashboard")
