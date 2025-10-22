@@ -37,6 +37,42 @@ def on_startup() -> None:
     except Exception as e:
         print(f"[startup] create_all failed: {e}")
     
+    # Inicializar apartamentos básicos si no existen
+    try:
+        from .db import SessionLocal
+        from . import models
+        
+        db = SessionLocal()
+        existing_apartments = db.query(models.Apartment).count()
+        
+        if existing_apartments == 0:
+            print("[startup] No apartments found, creating default apartments...")
+            
+            default_apartments = [
+                {"code": "SES01", "name": "Apartamento Centro", "owner_email": "admin@sesgas.com"},
+                {"code": "SES02", "name": "Apartamento Playa", "owner_email": "admin@sesgas.com"},
+                {"code": "SES03", "name": "Apartamento Montaña", "owner_email": "admin@sesgas.com"}
+            ]
+            
+            for apt_data in default_apartments:
+                apt = models.Apartment(
+                    code=apt_data["code"],
+                    name=apt_data["name"],
+                    owner_email=apt_data["owner_email"],
+                    is_active=True
+                )
+                db.add(apt)
+            
+            db.commit()
+            print(f"[startup] Created {len(default_apartments)} default apartments")
+        else:
+            print(f"[startup] Found {existing_apartments} existing apartments")
+            
+        db.close()
+        
+    except Exception as e:
+        print(f"[startup] Error initializing apartments: {e}")
+    
     # Iniciar bot de Telegram
     try:
         from .telegram_bot_service import telegram_service
