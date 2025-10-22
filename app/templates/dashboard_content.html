@@ -119,8 +119,8 @@
 </div>
 
 <script>
-// Dashboard data will be injected here
-let dashboardData = null;
+// Dashboard data injected from backend
+let dashboardData = {{ dashboard_data | safe }};
 
 // Initialize dashboard with data
 function initializeDashboard(data) {
@@ -282,22 +282,10 @@ function exportToPDF() {
 
 // Initialize dashboard when data is available
 document.addEventListener('DOMContentLoaded', function() {
-    // Get data from API
-    const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
-    const apartment = document.getElementById('apartmentSelect')?.value || '';
-    
-    let url = `/api/v1/dashboard/data?year=${year}`;
-    if (apartment) {
-        url += `&apartment_code=${apartment}`;
+    if (dashboardData) {
+        initializeDashboard(dashboardData);
+    } else {
+        console.error('No dashboard data available');
     }
-    
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            initializeDashboard(data);
-        })
-        .catch(error => {
-            console.error('Error loading dashboard data:', error);
-        });
 });
 </script>

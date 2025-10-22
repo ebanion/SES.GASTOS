@@ -2,18 +2,51 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, desc
 from decimal import Decimal
 from typing import Optional, List
 from datetime import datetime, date
 import json
+import os
 
 from app.db import get_db
 from app import models
 from app.schemas import DashboardMonthSummary, DashboardMonthlyResponse
 
+# Initialize templates with absolute path
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
+
+@router.get("/health")
+def dashboard_health(db: Session = Depends(get_db)):
+    """Dashboard health check with database connectivity"""
+    try:
+        # Test database connection
+        db.execute("SELECT 1")
+        
+        # Test if main tables exist
+        tables_exist = {
+            "apartments": db.execute("SELECT COUNT(*) FROM apartments").scalar() >= 0,
+            "expenses": db.execute("SELECT COUNT(*) FROM expenses").scalar() >= 0,
+            "incomes": db.execute("SELECT COUNT(*) FROM incomes").scalar() >= 0,
+            "reservations": db.execute("SELECT COUNT(*) FROM reservations").scalar() >= 0,
+        }
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "tables": tables_exist,
+            "templates_path": os.path.join(os.path.dirname(__file__), "templates")
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "database": "disconnected"
+        }
 
 def _f(x) -> float:
     # Convierte Decimal/None en float seguro
@@ -83,19 +116,19 @@ def dashboard_monthly(
     )
     expenses_map = {int(row.m): _f(row.total_exp) for row in expenses_q}
 
-    # RESERVATIONS (contadores totales por mes de check-in)
+    # RESERVATIONS (contadores por status por mes de check-in)
     res_q = (
         db.query(
             func.extract("month", models.Reservation.check_in).label("m"),
-            func.coalesce(func.count(models.Reservation.id), 0).label("total"),
+            func.coalesce(func.sum(case((models.Reservation.status == "CONFIRMED", 1), else_=0)), 0).label("confirmed"),
+            func.coalesce(func.sum(case((models.Reservation.status == "PENDING", 1), else_=0)), 0).label("pending"),
         )
         .filter(and_(*res_filter))
         .group_by("m")
         .all()
     )
-    res_total_map = {int(row.m): _i(row.total) for row in res_q}
-    res_acc_map = res_total_map  # Por ahora, todas las reservas se consideran confirmadas
-    res_pen_map = {m: 0 for m in range(1, 13)}  # Sin reservas pendientes por ahora
+    res_acc_map = {int(row.m): _i(row.confirmed) for row in res_q}
+    res_pen_map = {int(row.m): _i(row.pending) for row in res_q}
 
     # INCOMES (suma por status por mes)
     inc_q = (
@@ -136,53 +169,38 @@ def dashboard_monthly(
     return {"year": year, "items": items}
 
 @router.get("/", response_class=HTMLResponse)
-def dashboard_page():
+def dashboard_page(request: Request):
     """Serve the dashboard HTML page"""
-    import os
     try:
-        # Get the path relative to this file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        template_path = os.path.join(current_dir, "templates", "dashboard.html")
-        with open(template_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Dashboard template not found")
+        return templates.TemplateResponse("dashboard.html", {"request": request})
+    except Exception as e:
+        print(f"Error loading dashboard template: {e}")
+        raise HTTPException(status_code=404, detail=f"Dashboard template not found: {str(e)}")
 
 @router.get("/content", response_class=HTMLResponse)
 def dashboard_content(
+    request: Request,
     year: int = Query(default=datetime.now().year, description="Ej: 2025"),
     apartment_code: Optional[str] = Query(None, description="Opcional: SES01 para filtrar"),
     db: Session = Depends(get_db),
 ):
     """Serve dashboard content for HTMX updates"""
-    import os
     try:
-        # Get the path relative to this file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        template_path = os.path.join(current_dir, "templates", "dashboard_content.html")
-        with open(template_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        
-        # Get basic dashboard data (without the problematic expenses_by_category)
+        # Get basic dashboard data
         data = dashboard_monthly(year, apartment_code, db)
         
-        # Inject data as JavaScript
-        data_script = f"""
-        <script>
-        const dashboardData = {json.dumps(data, default=str)};
-        if (typeof initializeDashboard === 'function') {{
-            initializeDashboard(dashboardData);
-        }}
-        </script>
-        """
+        # Convert to JSON for JavaScript
+        data_json = json.dumps(data, default=str)
         
-        return HTMLResponse(content=content + data_script)
+        return templates.TemplateResponse("dashboard_content.html", {
+            "request": request,
+            "dashboard_data": data_json,
+            "year": year,
+            "apartment_code": apartment_code or ""
+        })
     except Exception as e:
-        # Better error handling
         print(f"Error in dashboard_content: {e}")
         return HTMLResponse(content=f'<div class="error">Error loading dashboard: {str(e)}</div>')
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Dashboard content template not found")
 
 @router.get("/data", response_model=DashboardMonthlyResponse)
 def dashboard_data(
@@ -191,13 +209,28 @@ def dashboard_data(
     db: Session = Depends(get_db),
 ):
     """Enhanced dashboard data with additional metrics"""
-    # Get the base monthly data
-    monthly_data = dashboard_monthly(year, apartment_code, db)
-    
-    # Skip expenses by category for now to avoid errors
-    # TODO: Implement expenses by category breakdown later
-    
-    return monthly_data
+    try:
+        # Get the base monthly data
+        monthly_data = dashboard_monthly(year, apartment_code, db)
+        return monthly_data
+    except Exception as e:
+        print(f"Error in dashboard_data: {e}")
+        # Return empty data structure instead of failing
+        return {
+            "year": year,
+            "items": [
+                DashboardMonthSummary(
+                    month=m,
+                    incomes_accepted=0.0,
+                    incomes_pending=0.0,
+                    reservations_accepted=0,
+                    reservations_pending=0,
+                    expenses=0.0,
+                    net=0.0,
+                )
+                for m in range(1, 13)
+            ],
+        }
 
 @router.get("/apartments")
 def get_apartments(db: Session = Depends(get_db)):

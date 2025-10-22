@@ -28,6 +28,9 @@ class Reservation(Base):
 
     # Puede ser nulo (no siempre se asigna al crear)
     apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=True)
+    
+    # Status para el dashboard: PENDING, CONFIRMED, CANCELLED
+    status = Column(String(20), nullable=False, default="CONFIRMED")
 
     created_at = Column(
         DateTime(timezone=True),
