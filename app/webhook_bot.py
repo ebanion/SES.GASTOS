@@ -89,7 +89,7 @@ async def usar_apartamento(update: Update, context):
         import asyncio
         
         # Usar httpx asíncrono con timeout más largo
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(f"{API_BASE_URL}/api/v1/apartments/")
             
             if response.status_code == 200:
@@ -151,7 +151,7 @@ async def status_command(update: Update, context):
         import httpx
         
         # Usar httpx asíncrono con timeout más largo
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(f"{API_BASE_URL}/api/v1/apartments/")
             
             if response.status_code == 200:
@@ -230,7 +230,7 @@ async def handle_text(update: Update, context):
             
             headers = {"Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY}
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 response = await client.post(
                     f"{API_BASE_URL}/api/v1/expenses/", 
                     json=expense_data, 
