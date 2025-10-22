@@ -93,7 +93,36 @@ def bot_status():
     """Obtener estado del bot de Telegram"""
     try:
         from .telegram_bot_service import telegram_service
-        return telegram_service.get_status()
+        status = telegram_service.get_status()
+        
+        # Agregar información adicional de diagnóstico
+        import os
+        status.update({
+            "environment_vars": {
+                "TELEGRAM_TOKEN": "***" + os.getenv("TELEGRAM_TOKEN", "")[-4:] if os.getenv("TELEGRAM_TOKEN") else None,
+                "OPENAI_API_KEY": "***" + os.getenv("OPENAI_API_KEY", "")[-4:] if os.getenv("OPENAI_API_KEY") else None,
+                "INTERNAL_KEY": bool(os.getenv("INTERNAL_KEY") or os.getenv("ADMIN_KEY")),
+                "API_BASE_URL": os.getenv("API_BASE_URL", "not_set")
+            },
+            "apartments_available": None  # Lo llenaremos después
+        })
+        
+        # Verificar apartamentos disponibles
+        try:
+            from .db import SessionLocal
+            from . import models
+            db = SessionLocal()
+            apartments_count = db.query(models.Apartment).count()
+            apartments = db.query(models.Apartment).limit(5).all()
+            status["apartments_available"] = {
+                "count": apartments_count,
+                "codes": [apt.code for apt in apartments]
+            }
+            db.close()
+        except Exception as e:
+            status["apartments_available"] = {"error": str(e)}
+        
+        return status
     except Exception as e:
         return {"error": str(e), "bot_running": False}
 
