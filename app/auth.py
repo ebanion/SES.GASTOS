@@ -31,10 +31,24 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Generar hash de contraseña"""
-    # bcrypt tiene límite de 72 bytes, truncar si es necesario
-    if len(password.encode('utf-8')) > 72:
-        password = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
-    return pwd_context.hash(password)
+    # bcrypt tiene límite de 72 bytes, truncar de forma segura
+    try:
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            # Truncar a 72 bytes de forma segura
+            truncated = password_bytes[:72]
+            # Asegurar que no cortamos un carácter UTF-8 a la mitad
+            try:
+                password = truncated.decode('utf-8')
+            except UnicodeDecodeError:
+                # Si hay error, truncar más conservadoramente
+                password = truncated[:71].decode('utf-8', errors='ignore')
+        
+        return pwd_context.hash(password)
+    except Exception as e:
+        # Si hay cualquier problema, usar solo los primeros 70 caracteres
+        safe_password = password[:70]
+        return pwd_context.hash(safe_password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Crear token JWT"""

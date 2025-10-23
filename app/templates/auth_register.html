@@ -260,8 +260,8 @@
 
                 <div class="form-group">
                     <label for="password">Contraseña *</label>
-                    <input type="password" id="password" name="password" placeholder="Mínimo 6 caracteres" required maxlength="72">
-                    <small>Debe tener entre 6 y 72 caracteres.</small>
+                    <input type="password" id="password" name="password" placeholder="Mínimo 6 caracteres" required maxlength="70">
+                    <small>Debe tener entre 6 y 70 caracteres.</small>
                 </div>
 
                 <div class="form-row">
@@ -303,8 +303,8 @@
                 showAlert('❌ La contraseña debe tener al menos 6 caracteres', 'error');
                 return;
             }
-            if (password.length > 72) {
-                showAlert('❌ La contraseña es demasiado larga (máximo 72 caracteres)', 'error');
+            if (password.length > 70) {
+                showAlert('❌ La contraseña es demasiado larga (máximo 70 caracteres)', 'error');
                 return;
             }
             
@@ -363,10 +363,10 @@
             const small = e.target.nextElementSibling;
             
             if (password.length < 6) {
-                small.textContent = 'Debe tener entre 6 y 72 caracteres. (Actual: ' + password.length + ')';
+                small.textContent = 'Debe tener entre 6 y 70 caracteres. (Actual: ' + password.length + ')';
                 small.style.color = '#ef4444';
-            } else if (password.length > 72) {
-                small.textContent = '¡Demasiado larga! Máximo 72 caracteres. (Actual: ' + password.length + ')';
+            } else if (password.length > 70) {
+                small.textContent = '¡Demasiado larga! Máximo 70 caracteres. (Actual: ' + password.length + ')';
                 small.style.color = '#ef4444';
             } else {
                 small.textContent = 'Longitud correcta ✓ (' + password.length + ' caracteres)';

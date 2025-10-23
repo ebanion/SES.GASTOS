@@ -92,12 +92,17 @@ def register(
 ):
     """Procesar registro"""
     
-    # Validaciones
+    # Validaciones más estrictas
     if len(password) < 6:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
     
-    if len(password.encode('utf-8')) > 72:
-        raise HTTPException(status_code=400, detail="La contraseña es demasiado larga. Máximo 72 caracteres.")
+    # Validar tanto longitud de caracteres como bytes
+    if len(password) > 70:  # Más conservador
+        raise HTTPException(status_code=400, detail="La contraseña es demasiado larga. Máximo 70 caracteres.")
+    
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 70:  # Más conservador con bytes también
+        raise HTTPException(status_code=400, detail="La contraseña contiene caracteres que ocupan demasiado espacio. Usa una contraseña más corta.")
     
     # Verificar si el usuario ya existe
     existing_user = db.query(models.User).filter(models.User.email == email.lower()).first()
@@ -157,3 +162,31 @@ def check_auth(user: models.User = Depends(get_current_user_optional)):
             }
         }
     return {"authenticated": False}
+
+@router.post("/test-password")
+def test_password_hash(password: str = Form(...)):
+    """Endpoint de prueba para verificar hash de contraseña"""
+    try:
+        from ..auth import get_password_hash
+        
+        # Información de debug
+        char_length = len(password)
+        byte_length = len(password.encode('utf-8'))
+        
+        # Intentar hacer hash
+        password_hash = get_password_hash(password)
+        
+        return {
+            "success": True,
+            "char_length": char_length,
+            "byte_length": byte_length,
+            "hash_created": True,
+            "hash_length": len(password_hash)
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "char_length": len(password),
+            "byte_length": len(password.encode('utf-8'))
+        }
