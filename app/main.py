@@ -212,6 +212,52 @@ if dashboard_router:
 def list_routes():
     return sorted([getattr(r, "path", "") for r in app.router.routes])
 
+@app.post("/test/create-expense")
+def test_create_expense():
+    """Endpoint de prueba para crear un gasto"""
+    try:
+        from .db import SessionLocal
+        from . import models
+        from datetime import date
+        
+        db = SessionLocal()
+        
+        # Buscar apartamento SES01
+        apt = db.query(models.Apartment).filter(models.Apartment.code == "SES01").first()
+        if not apt:
+            return {"error": "Apartamento SES01 no encontrado"}
+        
+        # Crear gasto de prueba
+        expense = models.Expense(
+            apartment_id=apt.id,
+            date=date.today(),
+            amount_gross=45.50,
+            currency="EUR",
+            category="Prueba",
+            description="Gasto de prueba desde endpoint",
+            vendor="Vendor Test",
+            source="test_endpoint"
+        )
+        
+        db.add(expense)
+        db.commit()
+        db.refresh(expense)
+        
+        result = {
+            "success": True,
+            "expense_id": expense.id,
+            "apartment_id": expense.apartment_id,
+            "amount": float(expense.amount_gross),
+            "date": str(expense.date),
+            "message": "Gasto creado exitosamente"
+        }
+        
+        db.close()
+        return result
+        
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
 @app.get("/bot/status")
 def bot_status():
     """Obtener estado del bot de Telegram"""
