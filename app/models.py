@@ -127,7 +127,19 @@ class Income(Base):
 
     status            = Column(String(20), nullable=False, default="PENDING")  # PENDING | CONFIRMED | CANCELLED
     non_refundable_at = Column(Date, nullable=True)
-    source            = Column(String(50))
+    source            = Column(String(50))  # BOOKING, AIRBNB, WEB, MANUAL
+    
+    # Nuevos campos para gestión de reservas por email
+    guest_name = Column(String(255), nullable=True)
+    guest_email = Column(String(255), nullable=True)
+    booking_reference = Column(String(100), nullable=True)
+    check_in_date = Column(Date, nullable=True)
+    check_out_date = Column(Date, nullable=True)
+    guests_count = Column(Integer, nullable=True)
+    
+    # Para tracking de emails procesados
+    email_message_id = Column(String(255), nullable=True, unique=True)
+    processed_from_email = Column(Boolean, default=False)
 
     created_at = Column(
         DateTime(timezone=True),
@@ -136,6 +148,10 @@ class Income(Base):
         server_default=func.now(),
     )
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relaciones
+    apartment = relationship("Apartment")
+    reservation = relationship("Reservation")
 
 
 # Código para añadir al final de models.py

@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración de Emails - SES.GASTOS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .navbar h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .btn-back {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .btn-back:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .intro-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .intro-section h2 {
+            color: #1f2937;
+            margin-bottom: 15px;
+            font-size: 2rem;
+        }
+
+        .intro-section p {
+            color: #6b7280;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .highlight-box {
+            background: #eff6ff;
+            border: 1px solid #2563eb;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .highlight-box h3 {
+            color: #1d4ed8;
+            margin-bottom: 10px;
+        }
+
+        .highlight-box p {
+            color: #1e40af;
+            margin: 0;
+        }
+
+        .setup-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .setup-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .setup-card h3 {
+            color: #1f2937;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .platform-icon {
+            font-size: 1.5rem;
+        }
+
+        .setup-steps {
+            list-style: none;
+            padding: 0;
+        }
+
+        .setup-steps li {
+            padding: 8px 0;
+            color: #4b5563;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .setup-steps li:last-child {
+            border-bottom: none;
+        }
+
+        .webhook-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .webhook-url {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            margin: 10px 0;
+            word-break: break-all;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #374151;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .copy-btn:hover {
+            background: #4b5563;
+        }
+
+        .test-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        .test-result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+        }
+
+        .test-success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+
+        .test-error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+
+        .apartments-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .apartment-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .apartment-code {
+            background: #10b981;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .setup-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .apartment-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <h1>📧 Configuración de Emails Automáticos</h1>
+            <a href="/dashboard" class="btn-back">← Volver al Dashboard</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Introducción -->
+        <div class="intro-section">
+            <h2>🤖 Automatización de Ingresos por Reservas</h2>
+            <p>
+                Configura el procesamiento automático de emails de reservas desde Booking.com, Airbnb y tu web propia. 
+                El sistema detectará automáticamente nuevas reservas y cancelaciones, actualizando tu contabilidad en tiempo real.
+            </p>
+            
+            <div class="highlight-box">
+                <h3>🎯 ¿Cómo funciona?</h3>
+                <p>
+                    <strong>1.</strong> Configuras el reenvío de emails de reservas a nuestros webhooks<br>
+                    <strong>2.</strong> Nuestro sistema procesa automáticamente los emails con IA<br>
+                    <strong>3.</strong> Los ingresos se registran automáticamente en el apartamento correcto<br>
+                    <strong>4.</strong> Se gestionan automáticamente los períodos de cancelación gratuita
+                </p>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('booking')">📊 Booking.com</button>
+            <button class="tab" onclick="showTab('airbnb')">🏠 Airbnb</button>
+            <button class="tab" onclick="showTab('web')">🌐 Web Propia</button>
+            <button class="tab" onclick="showTab('webhooks')">🔗 Webhooks</button>
+            <button class="tab" onclick="showTab('test')">🧪 Pruebas</button>
+        </div>
+
+        <!-- Booking.com Tab -->
+        <div id="booking-tab" class="tab-content active">
+            <div class="setup-card">
+                <h3><span class="platform-icon">📊</span> Configuración Booking.com</h3>
+                <ol class="setup-steps">
+                    <li><strong>Paso 1:</strong> Inicia sesión en tu Booking.com Partner Hub</li>
+                    <li><strong>Paso 2:</strong> Ve a "Configuración" → "Notificaciones por email"</li>
+                    <li><strong>Paso 3:</strong> En "Confirmaciones de reserva" añade email adicional</li>
+                    <li><strong>Paso 4:</strong> En "Cancelaciones" añade el mismo email</li>
+                    <li><strong>Paso 5:</strong> Configura reenvío automático a nuestro webhook</li>
+                </ol>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #f9fafb; border-radius: 8px;">
+                    <strong>📧 Email recomendado:</strong> <code>reservas@tu-dominio.com</code><br>
+                    <strong>🔄 Reenviar a:</strong> <code>{{ webhook_urls.general }}</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Airbnb Tab -->
+        <div id="airbnb-tab" class="tab-content">
+            <div class="setup-card">
+                <h3><span class="platform-icon">🏠</span> Configuración Airbnb</h3>
+                <ol class="setup-steps">
+                    <li><strong>Paso 1:</strong> Inicia sesión en tu cuenta Airbnb Host</li>
+                    <li><strong>Paso 2:</strong> Ve a "Configuración" → "Notificaciones"</li>
+                    <li><strong>Paso 3:</strong> En "Reservas" activa "Confirmación por email"</li>
+                    <li><strong>Paso 4:</strong> En "Cancelaciones" activa notificaciones</li>
+                    <li><strong>Paso 5:</strong> Configura reenvío desde tu email principal</li>
+                </ol>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #f9fafb; border-radius: 8px;">
+                    <strong>⚠️ Nota:</strong> Airbnb no permite emails adicionales directamente. 
+                    Debes configurar reenvío automático desde tu email principal.
+                </div>
+            </div>
+        </div>
+
+        <!-- Web Propia Tab -->
+        <div id="web-tab" class="tab-content">
+            <div class="setup-card">
+                <h3><span class="platform-icon">🌐</span> Configuración Web Propia</h3>
+                <p>Para tu sistema de reservas propio, envía un POST con este formato JSON:</p>
+                
+                <div class="webhook-url">
+{
+    "apartment_code": "APT001",
+    "guest_name": "Juan Pérez",
+    "guest_email": "juan@email.com",
+    "booking_reference": "WEB-2024-001",
+    "check_in": "2024-01-25",
+    "check_out": "2024-01-28",
+    "guests": 2,
+    "amount": 320.00,
+    "currency": "EUR",
+    "status": "CONFIRMED"
+}
+                </div>
+                
+                <p><strong>Endpoint:</strong></p>
+                <div class="webhook-url">
+                    POST {{ webhook_urls.manual }}
+                    <button class="copy-btn" onclick="copyToClipboard('{{ webhook_urls.manual }}')">Copiar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Webhooks Tab -->
+        <div id="webhooks-tab" class="tab-content">
+            <div class="webhook-section">
+                <h3>🔗 URLs de Webhooks</h3>
+                
+                <h4>📧 Webhook General (recomendado)</h4>
+                <div class="webhook-url">
+                    {{ webhook_urls.general }}
+                    <button class="copy-btn" onclick="copyToClipboard('{{ webhook_urls.general }}')">Copiar</button>
+                </div>
+                
+                <h4>📨 SendGrid Inbound Parse</h4>
+                <div class="webhook-url">
+                    {{ webhook_urls.sendgrid }}
+                    <button class="copy-btn" onclick="copyToClipboard('{{ webhook_urls.sendgrid }}')">Copiar</button>
+                </div>
+                
+                <h4>📮 Mailgun Routes</h4>
+                <div class="webhook-url">
+                    {{ webhook_urls.mailgun }}
+                    <button class="copy-btn" onclick="copyToClipboard('{{ webhook_urls.mailgun }}')">Copiar</button>
+                </div>
+                
+                <h4>🔧 Manual/Testing</h4>
+                <div class="webhook-url">
+                    {{ webhook_urls.manual }}
+                    <button class="copy-btn" onclick="copyToClipboard('{{ webhook_urls.manual }}')">Copiar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Tab -->
+        <div id="test-tab" class="tab-content">
+            <div class="test-section">
+                <h3>🧪 Pruebas del Sistema</h3>
+                
+                <button class="btn" onclick="testWebhook()">
+                    🚀 Probar Webhook
+                </button>
+                
+                <button class="btn btn-secondary" onclick="viewProcessedEmails()">
+                    📋 Ver Emails Procesados
+                </button>
+                
+                <button class="btn btn-warning" onclick="checkPendingReservations()">
+                    ⏰ Verificar Reservas Pendientes
+                </button>
+                
+                <div id="testResult"></div>
+            </div>
+        </div>
+
+        <!-- Apartamentos del Usuario -->
+        <div class="apartments-section">
+            <h3>🏠 Tus Apartamentos ({{ user_apartments|length }})</h3>
+            <p style="margin-bottom: 20px; color: #6b7280;">
+                Los emails de reservas se asociarán automáticamente a estos apartamentos por nombre o código:
+            </p>
+            
+            {% if user_apartments %}
+                {% for apartment in user_apartments %}
+                <div class="apartment-item">
+                    <div>
+                        <span class="apartment-code">{{ apartment.code }}</span>
+                        <strong style="margin-left: 10px;">{{ apartment.name }}</strong>
+                    </div>
+                    <div style="color: #6b7280; font-size: 0.9rem;">
+                        📧 {{ apartment.owner_email }}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div style="text-align: center; padding: 40px; color: #6b7280;">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">🏠</div>
+                    <p>No tienes apartamentos configurados aún.</p>
+                    <br>
+                    <a href="/dashboard/apartments" class="btn">+ Crear Primer Apartamento</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Ocultar todos los tabs
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(tab => tab.classList.remove('active'));
+            
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Mostrar tab seleccionado
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Mostrar feedback visual
+                event.target.textContent = '✅ Copiado';
+                setTimeout(() => {
+                    event.target.textContent = 'Copiar';
+                }, 2000);
+            });
+        }
+
+        async function testWebhook() {
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.innerHTML = '<div class="test-result">⏳ Probando webhook...</div>';
+            
+            try {
+                const response = await fetch('/email-setup/test-webhook');
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div class="test-result test-success">
+                            ✅ Webhook funcionando correctamente
+                            
+                            URL: ${result.webhook_url}
+                            Status: ${result.status_code}
+                            
+                            Respuesta: ${JSON.stringify(result.response, null, 2)}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="test-result test-error">
+                            ❌ Error en webhook
+                            
+                            Error: ${result.error}
+                            URL: ${result.webhook_url}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result test-error">
+                        ❌ Error de conexión: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function viewProcessedEmails() {
+            try {
+                const response = await fetch('/email-setup/webhook-logs');
+                const result = await response.json();
+                
+                const resultDiv = document.getElementById('testResult');
+                
+                if (result.logs && result.logs.length > 0) {
+                    let logsHtml = '<div class="test-result test-success">';
+                    logsHtml += `<strong>📧 Últimos ${result.logs.length} emails procesados:</strong>\n\n`;
+                    
+                    result.logs.forEach(log => {
+                        logsHtml += `${log.timestamp} | ${log.source} | ${log.apartment_code} | €${log.amount} | ${log.status}\n`;
+                    });
+                    
+                    logsHtml += '</div>';
+                    resultDiv.innerHTML = logsHtml;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="test-result">
+                            📭 No hay emails procesados aún.
+                            Configura el reenvío de emails para ver actividad aquí.
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('testResult').innerHTML = `
+                    <div class="test-result test-error">
+                        ❌ Error obteniendo logs: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function checkPendingReservations() {
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.innerHTML = '<div class="test-result">⏳ Verificando reservas pendientes...</div>';
+            
+            try {
+                const response = await fetch('/webhooks/email/check-pending', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result test-success">
+                        ✅ ${result.message}
+                        
+                        Reservas procesadas: ${result.results.length}
+                        
+                        ${result.results.map(r => 
+                            `${r.apartment_code}: €${r.amount} - ${r.booking_reference}`
+                        ).join('\n')}
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result test-error">
+                        ❌ Error verificando reservas: ${error.message}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

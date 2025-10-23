@@ -10,7 +10,7 @@ from . import models  # noqa
 from .db import Base, engine
 
 # Routers
-from .routers import reservations, expenses, apartments, incomes, admin, incomes, public, auth, user_dashboard
+from .routers import reservations, expenses, apartments, incomes, admin, incomes, public, auth, user_dashboard, email_webhooks, email_setup
 
 # Dashboard
 from .dashboard_api import router as dashboard_router
@@ -123,6 +123,8 @@ app.include_router(auth.router)
 app.include_router(user_dashboard.router)
 app.include_router(admin.router)
 app.include_router(public.router)
+app.include_router(email_webhooks.router)
+app.include_router(email_setup.router)
 app.include_router(dashboard_router)
 app.include_router(vectors.router)
 app.include_router(webhook_router)

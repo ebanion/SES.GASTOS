@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from .. import models, schemas
+from ..auth import get_current_user_optional
 
 router = APIRouter(prefix="/api/v1/incomes", tags=["incomes"])
 
@@ -37,6 +38,31 @@ def _to_out(row: models.Income) -> schemas.IncomeOut:
         source=row.source,
         created_at=row.created_at,
     )
+
+def _to_detailed_out(row: models.Income) -> dict:
+    """Convierte Income a dict con información detallada de reserva"""
+    return {
+        "id": str(row.id),
+        "reservation_id": str(row.reservation_id) if row.reservation_id else None,
+        "apartment_id": row.apartment_id,
+        "apartment_code": row.apartment.code if row.apartment else None,
+        "apartment_name": row.apartment.name if row.apartment else None,
+        "date": row.date.isoformat(),
+        "amount_gross": str(row.amount_gross),
+        "currency": row.currency,
+        "status": row.status,
+        "non_refundable_at": row.non_refundable_at.isoformat() if row.non_refundable_at else None,
+        "source": row.source,
+        "guest_name": row.guest_name,
+        "guest_email": row.guest_email,
+        "booking_reference": row.booking_reference,
+        "check_in_date": row.check_in_date.isoformat() if row.check_in_date else None,
+        "check_out_date": row.check_out_date.isoformat() if row.check_out_date else None,
+        "guests_count": row.guests_count,
+        "processed_from_email": row.processed_from_email,
+        "created_at": row.created_at.isoformat(),
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None
+    }
 
 
 @router.get("", response_model=list[schemas.IncomeOut])
@@ -138,4 +164,172 @@ def roll_confirm_incomes(db: Session = Depends(get_db)):
     db.commit()
 
     return {"ok": True, "confirmed": len(rows)}
+
+
+@router.get("/reservations")
+def list_reservation_incomes(
+    apartment_id: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+    source: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, le=200),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_optional)
+):
+    """
+    Lista ingresos de reservas con información detallada
+    Filtrado por usuario si no es admin
+    """
+    q = db.query(models.Income).filter(
+        models.Income.processed_from_email == True
+    )
+
+    # Filtrar por apartamentos del usuario si no es admin
+    if current_user and not current_user.is_admin:
+        user_apartment_ids = [apt.id for apt in current_user.apartments]
+        if not user_apartment_ids:
+            return {"reservations": [], "total": 0}
+        q = q.filter(models.Income.apartment_id.in_(user_apartment_ids))
+
+    if apartment_id:
+        q = q.filter(models.Income.apartment_id == apartment_id)
+
+    if status:
+        q = q.filter(models.Income.status == status)
+
+    if source:
+        q = q.filter(models.Income.source == source)
+
+    total = q.count()
+    rows = q.order_by(models.Income.created_at.desc()).limit(limit).all()
+    
+    return {
+        "reservations": [_to_detailed_out(r) for r in rows],
+        "total": total,
+        "showing": len(rows)
+    }
+
+
+@router.get("/stats")
+def get_income_stats(
+    apartment_id: Optional[str] = Query(default=None),
+    days: int = Query(default=30, le=365),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_optional)
+):
+    """
+    Estadísticas de ingresos por reservas
+    """
+    from_date = datetime.now() - timedelta(days=days)
+    
+    q = db.query(models.Income).filter(
+        models.Income.created_at >= from_date
+    )
+
+    # Filtrar por apartamentos del usuario si no es admin
+    if current_user and not current_user.is_admin:
+        user_apartment_ids = [apt.id for apt in current_user.apartments]
+        if not user_apartment_ids:
+            return {"error": "No apartments found for user"}
+        q = q.filter(models.Income.apartment_id.in_(user_apartment_ids))
+
+    if apartment_id:
+        q = q.filter(models.Income.apartment_id == apartment_id)
+
+    all_incomes = q.all()
+    
+    # Estadísticas generales
+    total_reservations = len(all_incomes)
+    confirmed_reservations = len([i for i in all_incomes if i.status == "CONFIRMED"])
+    pending_reservations = len([i for i in all_incomes if i.status == "PENDING"])
+    cancelled_reservations = len([i for i in all_incomes if i.status == "CANCELLED"])
+    
+    total_amount = sum(float(i.amount_gross) for i in all_incomes if i.status != "CANCELLED")
+    confirmed_amount = sum(float(i.amount_gross) for i in all_incomes if i.status == "CONFIRMED")
+    pending_amount = sum(float(i.amount_gross) for i in all_incomes if i.status == "PENDING")
+    
+    # Por fuente
+    by_source = {}
+    for source in ["BOOKING", "AIRBNB", "WEB", "MANUAL"]:
+        source_incomes = [i for i in all_incomes if i.source == source]
+        by_source[source] = {
+            "count": len(source_incomes),
+            "amount": sum(float(i.amount_gross) for i in source_incomes if i.status != "CANCELLED"),
+            "confirmed": len([i for i in source_incomes if i.status == "CONFIRMED"]),
+            "pending": len([i for i in source_incomes if i.status == "PENDING"]),
+            "cancelled": len([i for i in source_incomes if i.status == "CANCELLED"])
+        }
+    
+    # Próximos check-ins
+    upcoming_checkins = [
+        i for i in all_incomes 
+        if i.check_in_date and i.check_in_date >= datetime.now().date() and i.status == "CONFIRMED"
+    ]
+    
+    return {
+        "period_days": days,
+        "from_date": from_date.date().isoformat(),
+        "summary": {
+            "total_reservations": total_reservations,
+            "confirmed_reservations": confirmed_reservations,
+            "pending_reservations": pending_reservations,
+            "cancelled_reservations": cancelled_reservations,
+            "total_amount": total_amount,
+            "confirmed_amount": confirmed_amount,
+            "pending_amount": pending_amount
+        },
+        "by_source": by_source,
+        "upcoming_checkins": len(upcoming_checkins)
+    }
+
+
+@router.get("/upcoming-checkins")
+def get_upcoming_checkins(
+    days: int = Query(default=7, le=30),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_optional)
+):
+    """
+    Obtiene check-ins próximos
+    """
+    today = datetime.now().date()
+    end_date = today + timedelta(days=days)
+    
+    q = db.query(models.Income).filter(
+        models.Income.check_in_date >= today,
+        models.Income.check_in_date <= end_date,
+        models.Income.status == "CONFIRMED"
+    )
+
+    # Filtrar por apartamentos del usuario si no es admin
+    if current_user and not current_user.is_admin:
+        user_apartment_ids = [apt.id for apt in current_user.apartments]
+        if not user_apartment_ids:
+            return {"checkins": []}
+        q = q.filter(models.Income.apartment_id.in_(user_apartment_ids))
+
+    checkins = q.order_by(models.Income.check_in_date).all()
+    
+    # Agrupar por fecha
+    by_date = {}
+    for checkin in checkins:
+        date_key = checkin.check_in_date.isoformat()
+        if date_key not in by_date:
+            by_date[date_key] = []
+        
+        by_date[date_key].append({
+            "apartment_code": checkin.apartment.code if checkin.apartment else "N/A",
+            "apartment_name": checkin.apartment.name if checkin.apartment else "N/A",
+            "guest_name": checkin.guest_name,
+            "booking_reference": checkin.booking_reference,
+            "guests_count": checkin.guests_count,
+            "source": checkin.source,
+            "check_out_date": checkin.check_out_date.isoformat() if checkin.check_out_date else None,
+            "amount": str(checkin.amount_gross)
+        })
+    
+    return {
+        "period_days": days,
+        "checkins_by_date": by_date,
+        "total_checkins": len(checkins)
+    }
 
