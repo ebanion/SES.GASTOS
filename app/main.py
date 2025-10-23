@@ -73,20 +73,20 @@ def on_startup() -> None:
     except Exception as e:
         print(f"[startup] Error initializing apartments: {e}")
     
-    # Iniciar bot de Telegram
+    # Iniciar bot de Telegram (temporalmente deshabilitado)
     try:
-        from .telegram_bot_service import telegram_service
-        telegram_service.start_bot_in_thread()
-        print("[startup] Telegram bot service started")
+        # from .telegram_bot_service import telegram_service
+        # telegram_service.start_bot_in_thread()
+        print("[startup] ⚠️ Telegram bot temporalmente deshabilitado para solucionar problemas")
     except Exception as e:
         print(f"[startup] Telegram bot failed to start: {e}")
 
 @app.on_event("shutdown")
 def on_shutdown() -> None:
     try:
-        from .telegram_bot_service import telegram_service
-        telegram_service.stop_bot()
-        print("[shutdown] Telegram bot service stopped")
+        # from .telegram_bot_service import telegram_service
+        # telegram_service.stop_bot()
+        print("[shutdown] ⚠️ Telegram bot estaba deshabilitado")
     except Exception as e:
         print(f"[shutdown] Error stopping bot: {e}")
 
