@@ -9,17 +9,19 @@ from . import models  # noqa
 
 from .db import Base, engine
 
-# Routers
-from .routers import reservations, expenses, apartments, incomes, admin, public, auth, user_dashboard, email_webhooks, email_setup
+# Importaciones básicas primero
+try:
+    from .routers import auth, apartments, incomes
+    print("[import] ✅ Routers básicos importados")
+except Exception as e:
+    print(f"[import] ❌ Error en routers básicos: {e}")
 
-# Dashboard
-from .dashboard_api import router as dashboard_router
-
-# Vectors
-from .routers import vectors
-
-# Webhook Bot
-from .webhook_bot import webhook_router
+try:
+    from .dashboard_api import router as dashboard_router
+    print("[import] ✅ Dashboard importado")
+except Exception as e:
+    print(f"[import] ❌ Error en dashboard: {e}")
+    dashboard_router = None
 
 
 
@@ -125,15 +127,31 @@ app.include_router(reservations.router)
 app.include_router(expenses.router)
 app.include_router(apartments.router)
 app.include_router(incomes.router)   # <= IMPORTANTE
-app.include_router(auth.router)
-app.include_router(user_dashboard.router)
-app.include_router(admin.router)
-app.include_router(public.router)
-app.include_router(email_webhooks.router)
-app.include_router(email_setup.router)
-app.include_router(dashboard_router)
-app.include_router(vectors.router)
-app.include_router(webhook_router)
+# Incluir routers básicos solamente
+try:
+    app.include_router(auth.router)
+    print("[router] ✅ Auth router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo auth: {e}")
+
+try:
+    app.include_router(apartments.router)
+    print("[router] ✅ Apartments router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo apartments: {e}")
+
+try:
+    app.include_router(incomes.router)
+    print("[router] ✅ Incomes router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo incomes: {e}")
+
+if dashboard_router:
+    try:
+        app.include_router(dashboard_router)
+        print("[router] ✅ Dashboard router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo dashboard: {e}")
 
 # Pequeño debug para ver rutas en producción si hace falta
 @app.get("/debug/routes")
