@@ -447,7 +447,19 @@ async def telegram_webhook(request: Request):
         
         # Obtener datos del webhook
         data = await request.json()
-        update = Update.de_json(data, app.bot)
+        
+        # Validar estructura básica del webhook
+        if not data.get("message") and not data.get("callback_query"):
+            logger.warning(f"Webhook inválido recibido: {data}")
+            return {"ok": True, "status": "ignored"}
+        
+        # Crear Update desde JSON
+        try:
+            update = Update.de_json(data, app.bot)
+        except Exception as parse_error:
+            logger.error(f"Error parseando update: {parse_error}")
+            logger.error(f"Data recibida: {data}")
+            return {"ok": False, "error": f"Parse error: {str(parse_error)}"}
         
         # Procesar update
         await app.process_update(update)
