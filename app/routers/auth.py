@@ -105,10 +105,18 @@ def register(
     
     try:
         # Crear usuario
+        # Intentar hash con función principal, fallback si falla
+        try:
+            password_hash = get_password_hash(password)
+        except Exception as e:
+            print(f"[AUTH] get_password_hash failed: {e}, using simple fallback")
+            from ..simple_auth import simple_hash_password
+            password_hash = simple_hash_password(password)
+        
         user = models.User(
             email=email.lower().strip(),
             full_name=full_name.strip(),
-            password_hash=get_password_hash(password),
+            password_hash=password_hash,
             phone=phone.strip() if phone else None,
             company=company.strip() if company else None,
             is_active=True,

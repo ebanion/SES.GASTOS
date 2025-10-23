@@ -86,9 +86,21 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[models
     user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
         return None
-    if not verify_password(password, user.password_hash):
-        return None
-    return user
+    
+    # Intentar verificación normal, fallback si falla
+    try:
+        if verify_password(password, user.password_hash):
+            return user
+    except Exception as e:
+        print(f"[AUTH] verify_password failed: {e}, trying simple fallback")
+        try:
+            from .simple_auth import simple_verify_password
+            if simple_verify_password(password, user.password_hash):
+                return user
+        except Exception as e2:
+            print(f"[AUTH] simple_verify_password also failed: {e2}")
+    
+    return None
 
 def get_current_user(
     token: Optional[str] = Cookie(None, alias="access_token"),
