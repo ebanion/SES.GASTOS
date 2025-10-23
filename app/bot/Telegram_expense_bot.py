@@ -277,10 +277,9 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await update.message.reply_text("📄 Procesando PDF de factura...")
 
-    # 3) Descargar a archivo temporal
-    file = await doc.get_file()
-    tmp_path = None
-    try:
+        # 3) Descargar a archivo temporal
+        file = await doc.get_file()
+        tmp_path = None
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
             tmp_path = tmp.name
         await file.download_to_drive(tmp_path)
@@ -370,6 +369,9 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(f"❌ Error al registrar gasto:\n{msg}")
 
+    except Exception as e:
+        logger.exception("Error general en handle_pdf:")
+        await update.message.reply_text(f"❌ Error procesando PDF: {str(e)}")
     finally:
         # 8) Limpieza del temporal
         try:

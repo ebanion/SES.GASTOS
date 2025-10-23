@@ -11,7 +11,7 @@ from .db import Base, engine
 
 # Importaciones básicas primero
 try:
-    from .routers import auth, apartments, incomes
+    from .routers import auth, apartments, incomes, reservations, expenses, admin, public, user_dashboard, email_setup, email_webhooks, vectors
     print("[import] ✅ Routers básicos importados")
 except Exception as e:
     print(f"[import] ❌ Error en routers básicos: {e}")
@@ -140,6 +140,54 @@ try:
     print("[router] ✅ Incomes router incluido")
 except Exception as e:
     print(f"[router] ❌ Error incluyendo incomes: {e}")
+
+try:
+    app.include_router(reservations.router)
+    print("[router] ✅ Reservations router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo reservations: {e}")
+
+try:
+    app.include_router(expenses.router)
+    print("[router] ✅ Expenses router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo expenses: {e}")
+
+try:
+    app.include_router(admin.router)
+    print("[router] ✅ Admin router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo admin: {e}")
+
+try:
+    app.include_router(public.router)
+    print("[router] ✅ Public router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo public: {e}")
+
+try:
+    app.include_router(user_dashboard.router)
+    print("[router] ✅ User dashboard router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo user_dashboard: {e}")
+
+try:
+    app.include_router(email_setup.router)
+    print("[router] ✅ Email setup router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo email_setup: {e}")
+
+try:
+    app.include_router(email_webhooks.router)
+    print("[router] ✅ Email webhooks router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo email_webhooks: {e}")
+
+try:
+    app.include_router(vectors.router)
+    print("[router] ✅ Vectors router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo vectors: {e}")
 
 if dashboard_router:
     try:
