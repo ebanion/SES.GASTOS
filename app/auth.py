@@ -21,8 +21,13 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 días
 
-# Contexto de hash de contraseñas
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Contexto de hash de contraseñas con configuración específica para bcrypt
+pwd_context = CryptContext(
+    schemes=["bcrypt"], 
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__truncate_error=False  # No lanzar error, truncar automáticamente
+)
 security = HTTPBearer(auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -31,24 +36,18 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Generar hash de contraseña"""
-    # bcrypt tiene límite de 72 bytes, truncar de forma segura
-    try:
-        password_bytes = password.encode('utf-8')
-        if len(password_bytes) > 72:
-            # Truncar a 72 bytes de forma segura
-            truncated = password_bytes[:72]
-            # Asegurar que no cortamos un carácter UTF-8 a la mitad
-            try:
-                password = truncated.decode('utf-8')
-            except UnicodeDecodeError:
-                # Si hay error, truncar más conservadoramente
-                password = truncated[:71].decode('utf-8', errors='ignore')
-        
-        return pwd_context.hash(password)
-    except Exception as e:
-        # Si hay cualquier problema, usar solo los primeros 70 caracteres
-        safe_password = password[:70]
-        return pwd_context.hash(safe_password)
+    # Solución simple y directa: truncar a 70 caracteres siempre
+    if len(password) > 70:
+        password = password[:70]
+    
+    # Asegurar que no excede 72 bytes
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        # Truncar byte por byte hasta que esté bajo el límite
+        while len(password.encode('utf-8')) > 72 and len(password) > 0:
+            password = password[:-1]
+    
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Crear token JWT"""

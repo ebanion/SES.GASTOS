@@ -92,17 +92,16 @@ def register(
 ):
     """Procesar registro"""
     
-    # Validaciones más estrictas
+    # Validaciones muy estrictas
     if len(password) < 6:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
     
-    # Validar tanto longitud de caracteres como bytes
-    if len(password) > 70:  # Más conservador
-        raise HTTPException(status_code=400, detail="La contraseña es demasiado larga. Máximo 70 caracteres.")
+    if len(password) > 50:  # Muy conservador
+        raise HTTPException(status_code=400, detail="La contraseña es demasiado larga. Máximo 50 caracteres.")
     
-    password_bytes = password.encode('utf-8')
-    if len(password_bytes) > 70:  # Más conservador con bytes también
-        raise HTTPException(status_code=400, detail="La contraseña contiene caracteres que ocupan demasiado espacio. Usa una contraseña más corta.")
+    # Verificar bytes también
+    if len(password.encode('utf-8')) > 60:  # Muy conservador con bytes
+        raise HTTPException(status_code=400, detail="La contraseña contiene caracteres especiales que ocupan mucho espacio. Usa solo letras, números y símbolos básicos.")
     
     # Verificar si el usuario ya existe
     existing_user = db.query(models.User).filter(models.User.email == email.lower()).first()
