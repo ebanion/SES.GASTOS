@@ -376,6 +376,54 @@ def test_bot_connection():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.post("/create-test-expense")
+def create_test_expense():
+    """Crear gasto de prueba para verificar dashboard"""
+    from .db import SessionLocal
+    from . import models
+    from datetime import datetime, date
+    
+    db = SessionLocal()
+    try:
+        # Buscar apartamento SES01
+        apt = db.query(models.Apartment).filter(models.Apartment.code == "SES01").first()
+        if not apt:
+            return {"error": "Apartamento SES01 no encontrado"}
+        
+        # Crear gasto de prueba con fecha actual
+        expense = models.Expense(
+            apartment_id=apt.id,
+            date=date.today(),
+            amount_gross=75.25,
+            currency="EUR",
+            category="Restauración",
+            description="Gasto de prueba - Restaurante Test",
+            vendor="Restaurante Ejemplo",
+            source="test_manual",
+            invoice_number="TEST-001"
+        )
+        
+        db.add(expense)
+        db.commit()
+        db.refresh(expense)
+        
+        return {
+            "success": True,
+            "expense_id": expense.id,
+            "apartment_code": "SES01",
+            "apartment_id": expense.apartment_id,
+            "amount": float(expense.amount_gross),
+            "date": str(expense.date),
+            "vendor": expense.vendor,
+            "message": "✅ Gasto creado exitosamente - Debería aparecer en el dashboard"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "success": False}
+    finally:
+        db.close()
+
 @app.post("/init-demo-data")
 def init_demo_data():
     """TEMPORAL: Inicializar datos de demostración (ELIMINAR EN PRODUCCIÓN)"""
