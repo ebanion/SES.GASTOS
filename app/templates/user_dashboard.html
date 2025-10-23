@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Dashboard - SES.GASTOS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .navbar h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .navbar-user {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info {
+            text-align: right;
+        }
+
+        .user-name {
+            font-weight: 600;
+        }
+
+        .user-email {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .btn-logout {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .welcome-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .welcome-section h2 {
+            color: #1f2937;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        .welcome-section p {
+            color: #6b7280;
+            font-size: 1.1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 1rem;
+        }
+
+        .actions-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .action-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .action-card h3 {
+            color: #1f2937;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .action-card p {
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        }
+
+        .btn-secondary:hover {
+            box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4);
+        }
+
+        .apartments-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .section-header h3 {
+            color: #1f2937;
+            font-size: 1.5rem;
+        }
+
+        .apartments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .apartment-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .apartment-card:hover {
+            border-color: #10b981;
+            transform: translateY(-2px);
+        }
+
+        .apartment-code {
+            background: #10b981;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .apartment-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .apartment-info {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        .recent-expenses {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .expense-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .expense-item:last-child {
+            border-bottom: none;
+        }
+
+        .expense-info h4 {
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+
+        .expense-info p {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        .expense-amount {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #ef4444;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .actions-section {
+                grid-template-columns: 1fr;
+            }
+
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <h1>🏠 SES.GASTOS</h1>
+            <div class="navbar-user">
+                <div class="user-info">
+                    <div class="user-name">{{ user.full_name }}</div>
+                    <div class="user-email">{{ user.email }}</div>
+                </div>
+                <a href="#" onclick="logout()" class="btn-logout">🚪 Salir</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Welcome Section -->
+        <div class="welcome-section">
+            <h2>¡Bienvenido, {{ user.full_name }}! 👋</h2>
+            <p>Gestiona tus apartamentos y gastos desde tu panel personalizado.</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">🏠</div>
+                <div class="stat-number">{{ total_apartments }}</div>
+                <div class="stat-label">Apartamentos</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-number">{{ recent_expenses|length }}</div>
+                <div class="stat-label">Gastos Recientes</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">🤖</div>
+                <div class="stat-number">@UriApartment_Bot</div>
+                <div class="stat-label">Bot de Telegram</div>
+            </div>
+        </div>
+
+        <!-- Actions Section -->
+        <div class="actions-section">
+            <div class="action-card">
+                <h3>🏠 Gestionar Apartamentos</h3>
+                <p>Crea, edita y administra todos tus apartamentos desde un solo lugar.</p>
+                <a href="/dashboard/apartments" class="btn">Gestionar Apartamentos</a>
+            </div>
+
+            <div class="action-card">
+                <h3>📊 Ver Dashboard Financiero</h3>
+                <p>Accede a gráficos interactivos y reportes detallados de todos tus gastos.</p>
+                <a href="/api/v1/dashboard/" class="btn btn-secondary">Ver Dashboard</a>
+            </div>
+
+            <div class="action-card">
+                <h3>👤 Mi Perfil</h3>
+                <p>Actualiza tu información personal y configuraciones de cuenta.</p>
+                <a href="/dashboard/profile" class="btn">Editar Perfil</a>
+            </div>
+        </div>
+
+        <!-- Apartments Section -->
+        <div class="apartments-section">
+            <div class="section-header">
+                <h3>🏠 Mis Apartamentos</h3>
+                <a href="/dashboard/apartments" class="btn">+ Nuevo Apartamento</a>
+            </div>
+
+            {% if apartments %}
+            <div class="apartments-grid">
+                {% for apartment in apartments %}
+                <div class="apartment-card">
+                    <div class="apartment-code">{{ apartment.code }}</div>
+                    <div class="apartment-name">{{ apartment.name }}</div>
+                    <div class="apartment-info">
+                        <p>📧 {{ apartment.owner_email }}</p>
+                        <p>📅 Creado: {{ apartment.created_at.strftime('%d/%m/%Y') }}</p>
+                        <p>🤖 Bot: <code>/usar {{ apartment.code }}</code></p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">🏠</div>
+                <h3>No tienes apartamentos aún</h3>
+                <p>Crea tu primer apartamento para empezar a gestionar gastos.</p>
+                <br>
+                <a href="/dashboard/apartments" class="btn">+ Crear Mi Primer Apartamento</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Recent Expenses -->
+        {% if recent_expenses %}
+        <div class="recent-expenses">
+            <h3 style="margin-bottom: 25px; color: #1f2937;">💰 Gastos Recientes</h3>
+            
+            {% for expense in recent_expenses %}
+            <div class="expense-item">
+                <div class="expense-info">
+                    <h4>{{ expense.vendor or 'Proveedor no especificado' }}</h4>
+                    <p>{{ expense.category or 'Sin categoría' }} • {{ expense.date.strftime('%d/%m/%Y') }}</p>
+                </div>
+                <div class="expense-amount">-€{{ "%.2f"|format(expense.amount_gross) }}</div>
+            </div>
+            {% endfor %}
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="/api/v1/dashboard/" class="btn btn-secondary">Ver Todos los Gastos</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        async function logout() {
+            try {
+                const response = await fetch('/auth/logout', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/auth/login';
+                }
+            } catch (error) {
+                console.error('Error logging out:', error);
+                // Fallback: redirect anyway
+                window.location.href = '/auth/login';
+            }
+        }
+    </script>
+</body>
+</html>

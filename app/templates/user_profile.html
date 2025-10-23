@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Perfil - SES.GASTOS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .navbar h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .btn-back {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .btn-back:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .profile-section {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .profile-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            color: white;
+            margin: 0 auto 20px;
+        }
+
+        .profile-header h2 {
+            color: #1f2937;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        .profile-header p {
+            color: #6b7280;
+            font-size: 1.1rem;
+        }
+
+        .form-section {
+            margin-bottom: 30px;
+        }
+
+        .form-section h3 {
+            color: #1f2937;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 10px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .form-group input:disabled {
+            background: #f9fafb;
+            color: #6b7280;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+
+        .info-card {
+            background: #eff6ff;
+            border: 1px solid #2563eb;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .info-card h4 {
+            color: #1d4ed8;
+            margin-bottom: 10px;
+        }
+
+        .info-card p {
+            color: #1e40af;
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .profile-section {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <h1>👤 Mi Perfil</h1>
+            <a href="/dashboard" class="btn-back">← Volver al Dashboard</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="profile-section">
+            <!-- Profile Header -->
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    {{ user.full_name[0].upper() }}
+                </div>
+                <h2>{{ user.full_name }}</h2>
+                <p>Miembro desde {{ user.created_at.strftime('%B %Y') }}</p>
+                {% if user.last_login %}
+                <p style="font-size: 0.9rem; margin-top: 5px;">
+                    Último acceso: {{ user.last_login.strftime('%d/%m/%Y %H:%M') }}
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Info Card -->
+            <div class="info-card">
+                <h4>🤖 Tu Bot de Telegram</h4>
+                <p><strong>Bot:</strong> @UriApartment_Bot</p>
+                <p><strong>Cómo usar:</strong> Envía <code>/usar CODIGO</code> donde CODIGO es el código de tu apartamento</p>
+                <p><strong>Funciones:</strong> Procesa fotos y PDFs de facturas automáticamente con IA</p>
+            </div>
+
+            <!-- Alert -->
+            <div id="alert" style="display: none;"></div>
+
+            <!-- Account Info -->
+            <div class="form-section">
+                <h3>📧 Información de la Cuenta</h3>
+                <div class="form-group">
+                    <label for="email">Email (No se puede cambiar)</label>
+                    <input type="email" id="email" value="{{ user.email }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label for="user_id">ID de Usuario</label>
+                    <input type="text" id="user_id" value="{{ user.id }}" disabled>
+                </div>
+            </div>
+
+            <!-- Personal Info -->
+            <div class="form-section">
+                <h3>👤 Información Personal</h3>
+                <form id="profileForm">
+                    <div class="form-group">
+                        <label for="full_name">Nombre Completo *</label>
+                        <input type="text" id="full_name" name="full_name" value="{{ user.full_name }}" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="phone">Teléfono</label>
+                            <input type="tel" id="phone" name="phone" value="{{ user.phone or '' }}" placeholder="+34 600 123 456">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="company">Empresa</label>
+                            <input type="text" id="company" name="company" value="{{ user.company or '' }}" placeholder="Mi Empresa S.L.">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn" id="updateBtn">
+                        💾 Actualizar Perfil
+                    </button>
+                </form>
+            </div>
+
+            <!-- Account Stats -->
+            <div class="form-section">
+                <h3>📊 Estadísticas de la Cuenta</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                    <div style="background: #f9fafb; padding: 20px; border-radius: 10px; text-align: center;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">🏠</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #1f2937;">{{ user.apartments|length }}</div>
+                        <div style="color: #6b7280;">Apartamentos</div>
+                    </div>
+                    
+                    <div style="background: #f9fafb; padding: 20px; border-radius: 10px; text-align: center;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">📅</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #1f2937;">{{ user.created_at.strftime('%d/%m/%Y') }}</div>
+                        <div style="color: #6b7280;">Fecha de registro</div>
+                    </div>
+                    
+                    <div style="background: #f9fafb; padding: 20px; border-radius: 10px; text-align: center;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">✅</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #10b981;">Activo</div>
+                        <div style="color: #6b7280;">Estado</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Manejar actualización de perfil
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const updateBtn = document.getElementById('updateBtn');
+            const originalText = updateBtn.textContent;
+            
+            updateBtn.disabled = true;
+            updateBtn.textContent = '⏳ Actualizando...';
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch(`${API_BASE}/dashboard/profile/update`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert(`✅ ${result.message}`, 'success');
+                } else {
+                    showAlert(`❌ ${result.detail}`, 'error');
+                }
+                
+                updateBtn.disabled = false;
+                updateBtn.textContent = originalText;
+                
+            } catch (error) {
+                showAlert(`❌ Error de conexión: ${error.message}`, 'error');
+                updateBtn.disabled = false;
+                updateBtn.textContent = originalText;
+            }
+        });
+
+        // Función para mostrar alertas
+        function showAlert(message, type = 'success') {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            
+            // Auto-hide
+            setTimeout(() => alert.style.display = 'none', 5000);
+        }
+    </script>
+</body>
+</html>
