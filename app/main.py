@@ -122,11 +122,6 @@ def root():
 def dashboard_redirect():
     return RedirectResponse(url="/api/v1/dashboard/")
 
-# Montar routers (orden no crítico, pero admin al final está bien)
-app.include_router(reservations.router)
-app.include_router(expenses.router)
-app.include_router(apartments.router)
-app.include_router(incomes.router)   # <= IMPORTANTE
 # Incluir routers básicos solamente
 try:
     app.include_router(auth.router)
