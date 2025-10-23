@@ -424,6 +424,219 @@ def create_test_expense():
     finally:
         db.close()
 
+@app.post("/create-test-reservation")
+def create_test_reservation():
+    """Crear reserva de prueba para verificar dashboard"""
+    from .db import SessionLocal
+    from . import models
+    from datetime import datetime, date, timedelta
+    
+    db = SessionLocal()
+    try:
+        # Buscar apartamento SES01
+        apt = db.query(models.Apartment).filter(models.Apartment.code == "SES01").first()
+        if not apt:
+            return {"error": "Apartamento SES01 no encontrado"}
+        
+        # Crear reserva de prueba (check-in en 3 días, check-out en 7 días)
+        check_in_date = date.today() + timedelta(days=3)
+        check_out_date = date.today() + timedelta(days=7)
+        
+        reservation = models.Reservation(
+            apartment_id=apt.id,
+            check_in=check_in_date,
+            check_out=check_out_date,
+            guests=2,
+            channel="Booking.com",
+            email_contact="test@example.com",
+            phone_contact="+34123456789",
+            status="CONFIRMED"  # CONFIRMED, PENDING, CANCELLED
+        )
+        
+        db.add(reservation)
+        db.commit()
+        db.refresh(reservation)
+        
+        return {
+            "success": True,
+            "reservation_id": reservation.id,
+            "apartment_code": "SES01",
+            "apartment_id": reservation.apartment_id,
+            "check_in": str(reservation.check_in),
+            "check_out": str(reservation.check_out),
+            "guests": reservation.guests,
+            "status": reservation.status,
+            "message": "✅ Reserva creada exitosamente - Debería aparecer en el dashboard"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "success": False}
+    finally:
+        db.close()
+
+@app.post("/create-test-income")
+def create_test_income():
+    """Crear ingreso de prueba para verificar dashboard"""
+    from .db import SessionLocal
+    from . import models
+    from datetime import datetime, date, timedelta
+    
+    db = SessionLocal()
+    try:
+        # Buscar apartamento SES01
+        apt = db.query(models.Apartment).filter(models.Apartment.code == "SES01").first()
+        if not apt:
+            return {"error": "Apartamento SES01 no encontrado"}
+        
+        # Buscar una reserva existente (opcional)
+        reservation = db.query(models.Reservation).filter(
+            models.Reservation.apartment_id == apt.id
+        ).first()
+        
+        # Crear ingreso de prueba
+        income = models.Income(
+            apartment_id=apt.id,
+            reservation_id=reservation.id if reservation else None,
+            date=date.today(),
+            amount_gross=150.00,
+            currency="EUR",
+            status="CONFIRMED",  # CONFIRMED, PENDING, CANCELLED
+            source="test_manual",
+            description="Ingreso de prueba - Reserva test"
+        )
+        
+        db.add(income)
+        db.commit()
+        db.refresh(income)
+        
+        return {
+            "success": True,
+            "income_id": str(income.id),
+            "apartment_code": "SES01",
+            "apartment_id": income.apartment_id,
+            "reservation_id": income.reservation_id,
+            "amount": float(income.amount_gross),
+            "date": str(income.date),
+            "status": income.status,
+            "message": "✅ Ingreso creado exitosamente - Debería aparecer en el dashboard"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "success": False}
+    finally:
+        db.close()
+
+@app.post("/create-test-complete-flow")
+def create_test_complete_flow():
+    """Crear flujo completo: Reserva + Ingreso + Gasto"""
+    from .db import SessionLocal
+    from . import models
+    from datetime import datetime, date, timedelta
+    
+    db = SessionLocal()
+    try:
+        # Buscar apartamento SES01
+        apt = db.query(models.Apartment).filter(models.Apartment.code == "SES01").first()
+        if not apt:
+            return {"error": "Apartamento SES01 no encontrado"}
+        
+        results = {}
+        
+        # 1. Crear reserva
+        check_in_date = date.today() + timedelta(days=1)
+        check_out_date = date.today() + timedelta(days=5)
+        
+        reservation = models.Reservation(
+            apartment_id=apt.id,
+            check_in=check_in_date,
+            check_out=check_out_date,
+            guests=3,
+            channel="Airbnb",
+            email_contact="guest@example.com",
+            phone_contact="+34987654321",
+            status="CONFIRMED"
+        )
+        db.add(reservation)
+        db.flush()  # Para obtener el ID sin commit
+        
+        results["reservation"] = {
+            "id": reservation.id,
+            "check_in": str(reservation.check_in),
+            "check_out": str(reservation.check_out),
+            "guests": reservation.guests,
+            "status": reservation.status
+        }
+        
+        # 2. Crear ingreso asociado
+        income = models.Income(
+            apartment_id=apt.id,
+            reservation_id=reservation.id,
+            date=date.today(),
+            amount_gross=200.00,
+            currency="EUR",
+            status="CONFIRMED",
+            source="airbnb_booking",
+            description=f"Pago reserva {reservation.id}"
+        )
+        db.add(income)
+        db.flush()
+        
+        results["income"] = {
+            "id": str(income.id),
+            "amount": float(income.amount_gross),
+            "date": str(income.date),
+            "status": income.status,
+            "reservation_id": income.reservation_id
+        }
+        
+        # 3. Crear gasto asociado
+        expense = models.Expense(
+            apartment_id=apt.id,
+            date=date.today(),
+            amount_gross=35.75,
+            currency="EUR",
+            category="Limpieza",
+            description="Limpieza post check-out",
+            vendor="Limpieza Express",
+            source="reservation_expense"
+        )
+        db.add(expense)
+        db.flush()
+        
+        results["expense"] = {
+            "id": expense.id,
+            "amount": float(expense.amount_gross),
+            "date": str(expense.date),
+            "category": expense.category,
+            "vendor": expense.vendor
+        }
+        
+        # Commit todo junto
+        db.commit()
+        
+        # Calcular net
+        net_profit = income.amount_gross - expense.amount_gross
+        
+        return {
+            "success": True,
+            "apartment_code": "SES01",
+            "results": results,
+            "summary": {
+                "income": float(income.amount_gross),
+                "expense": float(expense.amount_gross),
+                "net_profit": float(net_profit)
+            },
+            "message": "✅ Flujo completo creado: Reserva + Ingreso + Gasto"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "success": False}
+    finally:
+        db.close()
+
 @app.post("/init-demo-data")
 def init_demo_data():
     """TEMPORAL: Inicializar datos de demostración (ELIMINAR EN PRODUCCIÓN)"""
