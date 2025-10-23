@@ -21,25 +21,53 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 días
 
-# Contexto de hash de contraseñas simplificado
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Contexto de hash de contraseñas con manejo de errores
+try:
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+except Exception as e:
+    print(f"[AUTH] Warning: bcrypt setup issue: {e}")
+    # Fallback más simple
+    pwd_context = CryptContext(schemes=["bcrypt"])
 security = HTTPBearer(auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verificar contraseña"""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        print(f"[AUTH] Error verifying with passlib, trying bcrypt directly: {e}")
+        # Fallback usando bcrypt directamente
+        try:
+            import bcrypt
+            password_bytes = plain_password.encode('utf-8')
+            if len(password_bytes) > 72:
+                password_bytes = password_bytes[:72]
+            return bcrypt.checkpw(password_bytes, hashed_password.encode('utf-8'))
+        except Exception as e2:
+            print(f"[AUTH] Error with bcrypt fallback: {e2}")
+            return False
 
 def get_password_hash(password: str) -> str:
     """Generar hash de contraseña"""
-    # bcrypt tiene un límite de 72 bytes, no caracteres
-    # Truncar la contraseña si excede este límite
-    password_bytes = password.encode('utf-8')
-    if len(password_bytes) > 72:
-        # Truncar byte por byte hasta que esté bajo el límite
-        while len(password.encode('utf-8')) > 72 and len(password) > 0:
-            password = password[:-1]
-    
-    return pwd_context.hash(password)
+    try:
+        # bcrypt tiene un límite de 72 bytes, no caracteres
+        # Truncar la contraseña si excede este límite
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            # Truncar byte por byte hasta que esté bajo el límite
+            while len(password.encode('utf-8')) > 72 and len(password) > 0:
+                password = password[:-1]
+        
+        return pwd_context.hash(password)
+    except Exception as e:
+        print(f"[AUTH] Error hashing password: {e}")
+        # Fallback usando bcrypt directamente
+        import bcrypt
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            password_bytes = password_bytes[:72]
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Crear token JWT"""
