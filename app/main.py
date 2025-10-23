@@ -376,6 +376,101 @@ def test_bot_connection():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.post("/create-demo-data-sql")
+def create_demo_data_sql():
+    """Crear datos de demostración usando SQL directo"""
+    from .db import SessionLocal
+    from sqlalchemy import text
+    from datetime import date
+    
+    db = SessionLocal()
+    try:
+        # Obtener apartment_id de SES01
+        result = db.execute(text("SELECT id FROM apartments WHERE code = 'SES01' LIMIT 1"))
+        apartment_row = result.fetchone()
+        if not apartment_row:
+            return {"error": "Apartamento SES01 no encontrado"}
+        
+        apartment_id = apartment_row[0]
+        today = date.today()
+        
+        # Crear múltiples gastos
+        expenses_sql = """
+        INSERT INTO expenses (id, apartment_id, date, amount_gross, currency, category, description, vendor, source, created_at)
+        VALUES 
+        (gen_random_uuid(), :apt_id, :date1, 45.50, 'EUR', 'Restauración', 'Cena en restaurante', 'Restaurante Demo', 'demo_sql', NOW()),
+        (gen_random_uuid(), :apt_id, :date2, 25.00, 'EUR', 'Transporte', 'Taxi al aeropuerto', 'Taxi Express', 'demo_sql', NOW()),
+        (gen_random_uuid(), :apt_id, :date3, 80.75, 'EUR', 'Limpieza', 'Limpieza profunda', 'Clean Pro', 'demo_sql', NOW()),
+        (gen_random_uuid(), :apt_id, :date4, 120.00, 'EUR', 'Mantenimiento', 'Reparación fontanería', 'Fontanero 24h', 'demo_sql', NOW())
+        """
+        
+        db.execute(text(expenses_sql), {
+            'apt_id': apartment_id,
+            'date1': today,
+            'date2': today,
+            'date3': today,
+            'date4': today
+        })
+        
+        # Crear reserva
+        reservation_sql = """
+        INSERT INTO reservations (id, apartment_id, check_in, check_out, guests, channel, email_contact, phone_contact, status, created_at)
+        VALUES (:res_id, :apt_id, :check_in, :check_out, 2, 'Booking.com', 'demo@test.com', '+34123456789', 'CONFIRMED', NOW())
+        """
+        
+        reservation_id = f"RES-{today.strftime('%Y%m%d')}-001"
+        check_in = date(2025, 10, 26)
+        check_out = date(2025, 10, 30)
+        
+        db.execute(text(reservation_sql), {
+            'res_id': reservation_id,
+            'apt_id': apartment_id,
+            'check_in': check_in,
+            'check_out': check_out
+        })
+        
+        # Crear ingresos
+        incomes_sql = """
+        INSERT INTO incomes (id, apartment_id, reservation_id, date, amount_gross, currency, status, source, guest_name, guest_email, booking_reference, created_at)
+        VALUES 
+        (gen_random_uuid(), :apt_id, :res_id, :date1, 200.00, 'EUR', 'CONFIRMED', 'booking_com', 'Juan Pérez', 'demo@test.com', 'BK001', NOW()),
+        (gen_random_uuid(), :apt_id, NULL, :date2, 150.00, 'EUR', 'CONFIRMED', 'airbnb', 'María García', 'maria@test.com', 'AIR002', NOW()),
+        (gen_random_uuid(), :apt_id, NULL, :date3, 180.00, 'EUR', 'PENDING', 'direct', 'Carlos López', 'carlos@test.com', 'DIR003', NOW())
+        """
+        
+        db.execute(text(incomes_sql), {
+            'apt_id': apartment_id,
+            'res_id': reservation_id,
+            'date1': today,
+            'date2': today,
+            'date3': today
+        })
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "apartment_id": apartment_id,
+            "created": {
+                "expenses": 4,
+                "reservations": 1, 
+                "incomes": 3
+            },
+            "totals": {
+                "expenses": 45.50 + 25.00 + 80.75 + 120.00,
+                "incomes_confirmed": 200.00 + 150.00,
+                "incomes_pending": 180.00,
+                "net_confirmed": (200.00 + 150.00) - (45.50 + 25.00 + 80.75 + 120.00)
+            },
+            "message": "✅ Datos de demostración creados con SQL directo"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "success": False}
+    finally:
+        db.close()
+
 @app.post("/create-test-expense")
 def create_test_expense():
     """Crear gasto de prueba para verificar dashboard"""
