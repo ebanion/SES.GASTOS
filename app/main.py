@@ -503,7 +503,9 @@ def create_test_income():
             currency="EUR",
             status="CONFIRMED",  # CONFIRMED, PENDING, CANCELLED
             source="test_manual",
-            description="Ingreso de prueba - Reserva test"
+            guest_name="Cliente Test",
+            guest_email="test@example.com",
+            booking_reference="TEST-001"
         )
         
         db.add(income)
@@ -578,7 +580,9 @@ def create_test_complete_flow():
             currency="EUR",
             status="CONFIRMED",
             source="airbnb_booking",
-            description=f"Pago reserva {reservation.id}"
+            guest_name="Cliente Airbnb",
+            guest_email="guest@example.com",
+            booking_reference=f"AIR-{reservation.id[:8]}"
         )
         db.add(income)
         db.flush()
