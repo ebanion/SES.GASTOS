@@ -318,6 +318,54 @@ def get_recent_expenses(
         for exp in expenses
     ]
 
+@router.get("/debug/expenses")
+def debug_expenses(
+    apartment_code: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Debug endpoint to check expenses data"""
+    try:
+        # Get apartment info
+        apartment_info = None
+        if apartment_code:
+            apt = db.query(models.Apartment).filter(models.Apartment.code == apartment_code).first()
+            if apt:
+                apartment_info = {"id": apt.id, "code": apt.code, "name": apt.name}
+        
+        # Get recent expenses
+        expenses_query = db.query(models.Expense)
+        if apartment_code and apartment_info:
+            expenses_query = expenses_query.filter(models.Expense.apartment_id == apartment_info["id"])
+        
+        recent_expenses = expenses_query.order_by(desc(models.Expense.created_at)).limit(10).all()
+        
+        expenses_data = []
+        for exp in recent_expenses:
+            expenses_data.append({
+                "id": exp.id,
+                "date": str(exp.date),
+                "amount_gross": float(exp.amount_gross),
+                "vendor": exp.vendor,
+                "category": exp.category,
+                "apartment_id": exp.apartment_id,
+                "created_at": str(exp.created_at),
+                "year": exp.date.year if exp.date else None,
+                "month": exp.date.month if exp.date else None
+            })
+        
+        # Get total count
+        total_expenses = db.query(models.Expense).count()
+        
+        return {
+            "apartment_info": apartment_info,
+            "total_expenses_in_db": total_expenses,
+            "recent_expenses": expenses_data,
+            "current_year": datetime.now().year,
+            "debug_info": "Check if expenses have correct dates and apartment_id"
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 @router.get("/summary-stats")
 def get_summary_stats(
     year: int = Query(default=datetime.now().year),

@@ -411,15 +411,30 @@ async def handle_text(update: Update, context):
             logger.error(f"Error creando gasto: {e}")
             await update.message.reply_text(f"❌ Error técnico: {str(e)}")
     else:
-        await update.message.reply_text(
-            f"📝 **Formato incorrecto**\n\n"
-            f"Envía 4-5 líneas:\n"
-            f"1. Fecha (YYYY-MM-DD)\n"
-            f"2. Importe (45.50)\n"
-            f"3. Proveedor\n"
-            f"4. Categoría\n"
-            f"5. Descripción (opcional)"
-        )
+        # Solo mostrar formato si parece que está intentando enviar datos de gasto
+        if len(lines) >= 2 and any(char.isdigit() for char in text):
+            await update.message.reply_text(
+                f"📝 **Formato incorrecto**\n\n"
+                f"Envía 4-5 líneas:\n"
+                f"1. Fecha (YYYY-MM-DD)\n"
+                f"2. Importe (45.50)\n"
+                f"3. Proveedor\n"
+                f"4. Categoría\n"
+                f"5. Descripción (opcional)"
+            )
+        else:
+            # Mensaje más amigable para otros casos
+            await update.message.reply_text(
+                f"🤖 **¡Hola!** \n\n"
+                f"📸 **Envía una foto o PDF** de tu factura para procesamiento automático\n\n"
+                f"📝 **O escribe los datos manualmente** en 4-5 líneas:\n"
+                f"• Fecha (YYYY-MM-DD)\n"
+                f"• Importe (45.50)\n"
+                f"• Proveedor\n"
+                f"• Categoría\n"
+                f"• Descripción (opcional)\n\n"
+                f"💡 **Tip:** Las fotos son más rápidas y precisas"
+            )
 
 @webhook_router.post("/telegram")
 async def telegram_webhook(request: Request):
