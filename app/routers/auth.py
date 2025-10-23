@@ -189,3 +189,39 @@ def test_password_hash(password: str = Form(...)):
             "char_length": len(password),
             "byte_length": len(password.encode('utf-8'))
         }
+
+@router.post("/create-test-user")
+def create_test_user(db: Session = Depends(get_db)):
+    """Crear usuario de prueba sin bcrypt"""
+    try:
+        # Verificar si ya existe
+        existing = db.query(models.User).filter(models.User.email == "test@test.com").first()
+        if existing:
+            return {"message": "Usuario test@test.com ya existe", "user_id": existing.id}
+        
+        # Crear usuario con hash simple (solo para testing)
+        import hashlib
+        simple_hash = hashlib.sha256("test123".encode()).hexdigest()
+        
+        user = models.User(
+            email="test@test.com",
+            full_name="Usuario Test",
+            password_hash=simple_hash,  # Hash simple para testing
+            is_active=True,
+            is_admin=False
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        return {
+            "success": True,
+            "message": "Usuario de prueba creado",
+            "user_id": user.id,
+            "email": user.email,
+            "login_info": "Email: test@test.com, Password: test123 (usar endpoint especial)"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        return {"success": False, "error": str(e)}
