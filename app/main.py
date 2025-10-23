@@ -10,7 +10,7 @@ from . import models  # noqa
 from .db import Base, engine
 
 # Routers
-from .routers import reservations, expenses, apartments, incomes, admin, incomes, public, auth, user_dashboard, email_webhooks, email_setup
+from .routers import reservations, expenses, apartments, incomes, admin, public, auth, user_dashboard, email_webhooks, email_setup
 
 # Dashboard
 from .dashboard_api import router as dashboard_router
@@ -108,7 +108,13 @@ def db_status():
 
 @app.get("/")
 def root():
-    return RedirectResponse(url="/auth/")
+    return {
+        "message": "🏠 SES.GASTOS - Sistema de Gestión de Gastos",
+        "status": "active",
+        "auth": "/auth/",
+        "dashboard": "/dashboard/",
+        "health": "/health"
+    }
 
 @app.get("/dashboard")
 def dashboard_redirect():
