@@ -92,16 +92,11 @@ def register(
 ):
     """Procesar registro"""
     
-    # Validaciones muy estrictas
+    # Validaciones básicas
     if len(password) < 6:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
     
-    if len(password) > 50:  # Muy conservador
-        raise HTTPException(status_code=400, detail="La contraseña es demasiado larga. Máximo 50 caracteres.")
-    
-    # Verificar bytes también
-    if len(password.encode('utf-8')) > 60:  # Muy conservador con bytes
-        raise HTTPException(status_code=400, detail="La contraseña contiene caracteres especiales que ocupan mucho espacio. Usa solo letras, números y símbolos básicos.")
+    # Nota: No limitamos la longitud aquí porque get_password_hash maneja el truncado automáticamente
     
     # Verificar si el usuario ya existe
     existing_user = db.query(models.User).filter(models.User.email == email.lower()).first()

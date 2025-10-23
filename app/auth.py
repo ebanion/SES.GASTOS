@@ -31,11 +31,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Generar hash de contraseña"""
-    # Solución simple y directa: truncar a 70 caracteres siempre
-    if len(password) > 70:
-        password = password[:70]
-    
-    # Asegurar que no excede 72 bytes
+    # bcrypt tiene un límite de 72 bytes, no caracteres
+    # Truncar la contraseña si excede este límite
     password_bytes = password.encode('utf-8')
     if len(password_bytes) > 72:
         # Truncar byte por byte hasta que esté bajo el límite
