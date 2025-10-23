@@ -96,6 +96,9 @@ def register(
     if len(password) < 6:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
     
+    if len(password.encode('utf-8')) > 72:
+        raise HTTPException(status_code=400, detail="La contraseña es demasiado larga. Máximo 72 caracteres.")
+    
     # Verificar si el usuario ya existe
     existing_user = db.query(models.User).filter(models.User.email == email.lower()).first()
     if existing_user:
