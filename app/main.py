@@ -75,20 +75,23 @@ def on_startup() -> None:
     except Exception as e:
         print(f"[startup] Error initializing apartments: {e}")
     
-    # Iniciar bot de Telegram (temporalmente deshabilitado)
+    # Iniciar bot de Telegram
     try:
-        # from .telegram_bot_service import telegram_service
-        # telegram_service.start_bot_in_thread()
-        print("[startup] ⚠️ Telegram bot temporalmente deshabilitado para solucionar problemas")
+        from .telegram_bot_service import telegram_service
+        if telegram_service.should_start_bot():
+            telegram_service.start_bot_in_thread()
+            print("[startup] ✅ Telegram bot iniciado correctamente")
+        else:
+            print("[startup] ⚠️ Telegram bot no iniciado - faltan variables de entorno")
     except Exception as e:
-        print(f"[startup] Telegram bot failed to start: {e}")
+        print(f"[startup] ❌ Error iniciando Telegram bot: {e}")
 
 @app.on_event("shutdown")
 def on_shutdown() -> None:
     try:
-        # from .telegram_bot_service import telegram_service
-        # telegram_service.stop_bot()
-        print("[shutdown] ⚠️ Telegram bot estaba deshabilitado")
+        from .telegram_bot_service import telegram_service
+        telegram_service.stop_bot()
+        print("[shutdown] ✅ Telegram bot detenido correctamente")
     except Exception as e:
         print(f"[shutdown] Error stopping bot: {e}")
 
@@ -188,6 +191,14 @@ try:
     print("[router] ✅ Vectors router incluido")
 except Exception as e:
     print(f"[router] ❌ Error incluyendo vectors: {e}")
+
+# Agregar webhook de Telegram para producción
+try:
+    from .webhook_bot import webhook_router
+    app.include_router(webhook_router)
+    print("[router] ✅ Telegram webhook router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo telegram webhook: {e}")
 
 if dashboard_router:
     try:
