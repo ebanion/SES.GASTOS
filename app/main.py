@@ -67,6 +67,73 @@ def on_startup() -> None:
             
             db.commit()
             print(f"[startup] Created {len(default_apartments)} default apartments")
+            
+            # Crear datos de demostración automáticamente
+            try:
+                from datetime import date, timedelta
+                
+                # Crear gastos de demo
+                expenses_demo = [
+                    {"amount": 45.50, "category": "Restauración", "vendor": "Restaurante Demo", "description": "Cena de negocios"},
+                    {"amount": 25.00, "category": "Transporte", "vendor": "Taxi Express", "description": "Traslado aeropuerto"},
+                    {"amount": 80.75, "category": "Limpieza", "vendor": "Clean Pro", "description": "Limpieza profunda"},
+                    {"amount": 35.00, "category": "Suministros", "vendor": "Ferretería Local", "description": "Material de reparación"}
+                ]
+                
+                for i, exp_data in enumerate(expenses_demo):
+                    expense = models.Expense(
+                        apartment_id=created_apartments[0].id,  # SES01
+                        date=date.today(),
+                        amount_gross=exp_data["amount"],
+                        currency="EUR",
+                        category=exp_data["category"],
+                        description=exp_data["description"],
+                        vendor=exp_data["vendor"],
+                        source="demo_startup"
+                    )
+                    db.add(expense)
+                
+                # Crear reservas de demo
+                reservation = models.Reservation(
+                    apartment_id=created_apartments[0].id,
+                    check_in=date.today() + timedelta(days=2),
+                    check_out=date.today() + timedelta(days=6),
+                    guests=2,
+                    channel="Booking.com",
+                    email_contact="demo@example.com",
+                    phone_contact="+34123456789",
+                    status="CONFIRMED"
+                )
+                db.add(reservation)
+                db.flush()  # Para obtener ID
+                
+                # Crear ingresos de demo
+                incomes_demo = [
+                    {"amount": 200.00, "status": "CONFIRMED", "source": "booking_com", "guest": "Juan Pérez"},
+                    {"amount": 150.00, "status": "CONFIRMED", "source": "airbnb", "guest": "María García"},
+                    {"amount": 180.00, "status": "PENDING", "source": "direct", "guest": "Carlos López"}
+                ]
+                
+                for inc_data in incomes_demo:
+                    income = models.Income(
+                        apartment_id=created_apartments[0].id,
+                        reservation_id=reservation.id if inc_data["status"] == "CONFIRMED" else None,
+                        date=date.today(),
+                        amount_gross=inc_data["amount"],
+                        currency="EUR",
+                        status=inc_data["status"],
+                        source=inc_data["source"],
+                        guest_name=inc_data["guest"],
+                        guest_email=f"{inc_data['guest'].lower().replace(' ', '.')}@example.com"
+                    )
+                    db.add(income)
+                
+                db.commit()
+                print(f"[startup] ✅ Datos de demostración creados: {len(expenses_demo)} gastos, 1 reserva, {len(incomes_demo)} ingresos")
+                
+            except Exception as demo_error:
+                print(f"[startup] ⚠️ Error creando datos demo: {demo_error}")
+                db.rollback()
         else:
             print(f"[startup] Found {existing_apartments} existing apartments")
             
