@@ -68,56 +68,36 @@ except Exception as e:
 # ------------------------------------------------------------
 connect_args = {}
 
-# Crear engine con configuración optimizada
-if "postgresql" in DATABASE_URL:
-    print("[DB] 🐘 Configurando PostgreSQL...")
-    connect_args = {
-        "connect_timeout": 30,
-        "application_name": "ses-gastos"
-    }
-    engine = create_engine(
-        DATABASE_URL, 
-        pool_pre_ping=True, 
-        connect_args=connect_args,
-        pool_timeout=30,
-        pool_recycle=3600
-    )
-else:
-    print("[DB] 📁 Configurando SQLite...")
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-
-# Test de conexión
+# Crear engine y probar conexión
 try:
+    if "postgresql" in DATABASE_URL:
+        print("[DB] 🐘 Intentando PostgreSQL...")
+        connect_args = {"connect_timeout": 30, "application_name": "ses-gastos"}
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
+    else:
+        print("[DB] 📁 Configurando SQLite...")
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    
+    # Test básico de conexión
     from sqlalchemy import text
     with engine.connect() as conn:
-        result = conn.execute(text("SELECT 1")).scalar()
-        if "postgresql" in DATABASE_URL:
-            version = conn.execute(text("SELECT version()")).scalar()
-            print(f"[DB] ✅ PostgreSQL conectado: {version.split(' ')[1]}")
-        else:
-            print("[DB] ✅ SQLite conectado")
-            
-except Exception as e:
-    print(f"[DB] ❌ Error de conexión: {type(e).__name__}: {e}")
+        conn.execute(text("SELECT 1"))
     
     if "postgresql" in DATABASE_URL:
-        print(f"[DB] 🔄 Intentando con driver alternativo...")
-        try:
-            # Probar sin psycopg específico
-            alt_url = DATABASE_URL.replace("postgresql+psycopg://", "postgresql://")
-            engine = create_engine(alt_url, pool_pre_ping=True)
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            DATABASE_URL = alt_url
-            print("[DB] ✅ Driver alternativo funcionando")
-        except Exception as alt_e:
-            print(f"[DB] ❌ Driver alternativo falló: {alt_e}")
-            print(f"[DB] 🔄 Cayendo a SQLite...")
-            import tempfile
-            db_dir = os.getenv("SQLITE_DIR", "/tmp")
-            DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos.db"
-            engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-            print(f"[DB] SQLite: {db_dir}/ses_gastos.db")
+        print("[DB] ✅ PostgreSQL conectado exitosamente")
+    else:
+        print("[DB] ✅ SQLite conectado exitosamente")
+        
+except Exception as e:
+    print(f"[DB] ❌ Error: {type(e).__name__}: {e}")
+    
+    # Fallback a SQLite si PostgreSQL falla
+    if "postgresql" in DATABASE_URL:
+        print("[DB] 🔄 Fallback a SQLite...")
+        db_dir = os.getenv("SQLITE_DIR", "/tmp")
+        DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos.db"
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        print(f"[DB] SQLite: {db_dir}/ses_gastos.db")
     else:
         raise e
 
