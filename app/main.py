@@ -454,6 +454,43 @@ def migrate_postgres():
             "message": "❌ Error en migración"
         }
 
+@app.post("/create-tables-force")
+def create_tables_force():
+    """Forzar creación de tablas en la base de datos actual"""
+    try:
+        from app.db import engine, Base
+        from app import models  # Importar todos los modelos
+        
+        # Crear todas las tablas
+        Base.metadata.create_all(bind=engine)
+        
+        # Verificar que se crearon
+        from sqlalchemy import text
+        tables_created = []
+        
+        with engine.connect() as conn:
+            for table_name in ["users", "apartments", "expenses", "incomes", "reservations"]:
+                try:
+                    result = conn.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+                    count = result.scalar()
+                    tables_created.append(f"✅ {table_name}: {count} registros")
+                except Exception as e:
+                    tables_created.append(f"❌ {table_name}: {e}")
+        
+        return {
+            "success": True,
+            "message": "✅ Tablas creadas forzadamente",
+            "tables": tables_created,
+            "database_url": "SQLite" if "sqlite" in str(engine.url) else "PostgreSQL"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "❌ Error creando tablas"
+        }
+
 @app.get("/test-postgres")
 def test_postgres_direct():
     """Probar conexión directa a PostgreSQL"""
