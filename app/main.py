@@ -166,6 +166,40 @@ def on_shutdown() -> None:
 def health():
     return {"ok": True}
 
+@app.get("/test-postgres")
+def test_postgres_direct():
+    """Probar conexión directa a PostgreSQL"""
+    import os
+    from sqlalchemy import create_engine, text
+    
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return {"error": "DATABASE_URL no configurada"}
+    
+    # Mostrar URL (enmascarada)
+    import re
+    masked_url = re.sub(r"://([^:@]+):[^@]+@", r"://\1:***@", database_url)
+    
+    try:
+        # Probar conexión directa sin fallback
+        engine = create_engine(database_url, pool_pre_ping=True)
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT version()")).scalar()
+            return {
+                "success": True,
+                "database_url": masked_url,
+                "postgres_version": result,
+                "message": "✅ PostgreSQL conectado exitosamente"
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "database_url": masked_url,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "message": "❌ Error conectando a PostgreSQL"
+        }
+
 @app.get("/db-status")
 def db_status():
     """Check database connection status"""
