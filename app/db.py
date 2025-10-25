@@ -64,8 +64,12 @@ except Exception as e:
     print(f"[DB] ❌ Database connection failed: {e}")
     print(f"[DB] 🔄 Falling back to SQLite for development")
     # Fallback to SQLite if PostgreSQL fails
-    DATABASE_URL = "sqlite:///fallback.db"
+    # Usar directorio persistente si está disponible
+    import tempfile
+    db_dir = os.getenv("SQLITE_DIR", "/tmp")
+    DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos.db"
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    print(f"[DB] SQLite path: {db_dir}/ses_gastos.db")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
