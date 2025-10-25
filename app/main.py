@@ -170,14 +170,15 @@ def on_startup() -> None:
     except Exception as e:
         print(f"[startup] Error initializing apartments: {e}")
     
-    # Iniciar bot de Telegram
+    # Iniciar bot de Telegram (temporalmente deshabilitado por problemas de threading)
     try:
-        from .telegram_bot_service import telegram_service
-        if telegram_service.should_start_bot():
-            telegram_service.start_bot_in_thread()
-            print("[startup] ✅ Telegram bot iniciado correctamente")
-        else:
-            print("[startup] ⚠️ Telegram bot no iniciado - faltan variables de entorno")
+        # from .telegram_bot_service import telegram_service
+        # if telegram_service.should_start_bot():
+        #     telegram_service.start_bot_in_thread()
+        #     print("[startup] ✅ Telegram bot iniciado correctamente")
+        # else:
+        #     print("[startup] ⚠️ Telegram bot no iniciado - faltan variables de entorno")
+        print("[startup] ⚠️ Bot Telegram deshabilitado temporalmente (usar webhooks)")
     except Exception as e:
         print(f"[startup] ❌ Error iniciando Telegram bot: {e}")
 
@@ -242,6 +243,134 @@ def force_postgres_connection():
             "success": False,
             "error": str(e),
             "message": "❌ No se pudo forzar PostgreSQL"
+        }
+
+@app.post("/init-postgres-tables")
+def init_postgres_tables():
+    """Inicializar tablas en PostgreSQL y crear datos demo"""
+    import os
+    from sqlalchemy import create_engine, text
+    from datetime import date, timedelta
+    
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url or "postgresql" not in database_url:
+        return {"error": "DATABASE_URL PostgreSQL no configurada"}
+    
+    try:
+        # Conectar a PostgreSQL
+        pg_engine = create_engine(
+            database_url, 
+            pool_pre_ping=True,
+            connect_args={"connect_timeout": 30}
+        )
+        
+        # Crear todas las tablas
+        from app.db import Base
+        from app import models
+        Base.metadata.create_all(bind=pg_engine)
+        
+        # Crear sesión para datos demo
+        from sqlalchemy.orm import sessionmaker
+        SessionPG = sessionmaker(bind=pg_engine)
+        db = SessionPG()
+        
+        try:
+            # Verificar si ya hay apartamentos
+            existing_apartments = db.query(models.Apartment).count()
+            
+            if existing_apartments == 0:
+                # Crear apartamentos demo
+                apartments_demo = [
+                    {"code": "SES01", "name": "Apartamento Centro", "owner_email": "demo@sesgas.com"},
+                    {"code": "SES02", "name": "Apartamento Playa", "owner_email": "demo@sesgas.com"},
+                    {"code": "SES03", "name": "Apartamento Montaña", "owner_email": "demo@sesgas.com"}
+                ]
+                
+                created_apartments = []
+                for apt_data in apartments_demo:
+                    apt = models.Apartment(
+                        code=apt_data["code"],
+                        name=apt_data["name"],
+                        owner_email=apt_data["owner_email"],
+                        is_active=True
+                    )
+                    db.add(apt)
+                    created_apartments.append(apt)
+                
+                db.commit()
+                
+                # Refresh para obtener IDs
+                for apt in created_apartments:
+                    db.refresh(apt)
+                
+                # Crear gastos demo
+                expenses_demo = [
+                    {"amount": 45.50, "category": "Restauración", "vendor": "Restaurante Demo"},
+                    {"amount": 25.00, "category": "Transporte", "vendor": "Taxi Express"},
+                    {"amount": 80.75, "category": "Limpieza", "vendor": "Clean Pro"},
+                    {"amount": 35.00, "category": "Suministros", "vendor": "Ferretería"}
+                ]
+                
+                for exp_data in expenses_demo:
+                    expense = models.Expense(
+                        apartment_id=created_apartments[0].id,  # SES01
+                        date=date.today(),
+                        amount_gross=exp_data["amount"],
+                        currency="EUR",
+                        category=exp_data["category"],
+                        vendor=exp_data["vendor"],
+                        description=f"Demo - {exp_data['vendor']}",
+                        source="postgres_init"
+                    )
+                    db.add(expense)
+                
+                # Crear ingresos demo
+                incomes_demo = [
+                    {"amount": 200.00, "status": "CONFIRMED", "guest": "Juan Pérez"},
+                    {"amount": 150.00, "status": "CONFIRMED", "guest": "María García"},
+                    {"amount": 180.00, "status": "PENDING", "guest": "Carlos López"}
+                ]
+                
+                for inc_data in incomes_demo:
+                    income = models.Income(
+                        apartment_id=created_apartments[0].id,
+                        date=date.today(),
+                        amount_gross=inc_data["amount"],
+                        currency="EUR",
+                        status=inc_data["status"],
+                        source="postgres_init",
+                        guest_name=inc_data["guest"],
+                        guest_email=f"{inc_data['guest'].lower().replace(' ', '.')}@example.com"
+                    )
+                    db.add(income)
+                
+                db.commit()
+                
+                return {
+                    "success": True,
+                    "message": "✅ PostgreSQL inicializado con datos demo",
+                    "created": {
+                        "apartments": len(created_apartments),
+                        "expenses": len(expenses_demo),
+                        "incomes": len(incomes_demo)
+                    },
+                    "apartment_codes": [apt.code for apt in created_apartments]
+                }
+            else:
+                return {
+                    "success": True,
+                    "message": f"PostgreSQL ya tiene {existing_apartments} apartamentos",
+                    "existing_apartments": existing_apartments
+                }
+                
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "❌ Error inicializando PostgreSQL"
         }
 
 @app.get("/test-postgres")
