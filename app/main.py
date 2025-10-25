@@ -170,11 +170,25 @@ def health():
 def db_status():
     """Check database connection status"""
     try:
-        from app.db import engine
+        from app.db import engine, DATABASE_URL
         from sqlalchemy import text
+        import os
+        
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        return {"database": "connected", "status": "ok"}
+        
+        # Información detallada de la base de datos
+        return {
+            "database": "connected", 
+            "status": "ok",
+            "database_url": DATABASE_URL,
+            "database_type": "postgresql" if "postgresql" in DATABASE_URL else "sqlite",
+            "environment_vars": {
+                "DATABASE_URL": "***" + os.getenv("DATABASE_URL", "NOT_SET")[-20:] if os.getenv("DATABASE_URL") else "NOT_SET",
+                "POSTGRES_URL": "***" + os.getenv("POSTGRES_URL", "NOT_SET")[-20:] if os.getenv("POSTGRES_URL") else "NOT_SET",
+                "DATABASE_PRIVATE_URL": "***" + os.getenv("DATABASE_PRIVATE_URL", "NOT_SET")[-20:] if os.getenv("DATABASE_PRIVATE_URL") else "NOT_SET"
+            }
+        }
     except Exception as e:
         return {"database": "disconnected", "error": str(e), "status": "error"}
 
