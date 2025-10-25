@@ -417,28 +417,48 @@ def migrate_postgres():
             except Exception as e:
                 migrations.append(f"⚠️ Tabla users: {e}")
             
-            # Migración 3: Agregar foreign key si no existe
+            # Migración 3: Agregar foreign key (sin IF NOT EXISTS)
             try:
-                conn.execute(text("""
-                    ALTER TABLE apartments 
-                    ADD CONSTRAINT IF NOT EXISTS apartments_user_id_fkey 
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-                """))
-                migrations.append("✅ Foreign key apartments->users agregada")
+                # Primero verificar si existe
+                fk_check = conn.execute(text("""
+                    SELECT COUNT(*) FROM information_schema.table_constraints 
+                    WHERE constraint_name = 'apartments_user_id_fkey' 
+                    AND table_name = 'apartments'
+                """)).scalar()
+                
+                if fk_check == 0:
+                    conn.execute(text("""
+                        ALTER TABLE apartments 
+                        ADD CONSTRAINT apartments_user_id_fkey 
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+                    """))
+                    migrations.append("✅ Foreign key apartments->users agregada")
+                else:
+                    migrations.append("✅ Foreign key apartments->users ya existe")
             except Exception as e:
                 migrations.append(f"⚠️ Foreign key: {e}")
             
-            # Migración 4: Verificar otras tablas
-            tables_to_check = ["expenses", "incomes", "reservations"]
+            conn.commit()
+        
+        # Migración 4: Crear todas las tablas usando SQLAlchemy
+        try:
+            from app.db import Base
+            from app import models
+            Base.metadata.create_all(bind=pg_engine)
+            migrations.append("✅ Todas las tablas creadas con SQLAlchemy")
+        except Exception as e:
+            migrations.append(f"⚠️ SQLAlchemy create_all: {e}")
+        
+        # Migración 5: Verificar tablas finales
+        with pg_engine.connect() as conn:
+            tables_to_check = ["users", "apartments", "expenses", "incomes", "reservations"]
             for table in tables_to_check:
                 try:
-                    result = conn.execute(text(f"SELECT COUNT(*) FROM {table} LIMIT 1"))
+                    result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
                     count = result.scalar()
                     migrations.append(f"✅ Tabla {table}: {count} registros")
                 except Exception as e:
                     migrations.append(f"❌ Tabla {table}: {e}")
-            
-            conn.commit()
         
         return {
             "success": True,
