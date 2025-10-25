@@ -373,6 +373,87 @@ def init_postgres_tables():
             "message": "❌ Error inicializando PostgreSQL"
         }
 
+@app.post("/migrate-postgres")
+def migrate_postgres():
+    """Migrar estructura de PostgreSQL y agregar columnas faltantes"""
+    import os
+    from sqlalchemy import create_engine, text
+    
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url or "postgresql" not in database_url:
+        return {"error": "DATABASE_URL PostgreSQL no configurada"}
+    
+    try:
+        # Conectar a PostgreSQL
+        pg_engine = create_engine(database_url, pool_pre_ping=True)
+        
+        migrations = []
+        
+        with pg_engine.connect() as conn:
+            # Migración 1: Agregar user_id a apartments si no existe
+            try:
+                conn.execute(text("ALTER TABLE apartments ADD COLUMN IF NOT EXISTS user_id VARCHAR(36)"))
+                migrations.append("✅ Columna user_id agregada a apartments")
+            except Exception as e:
+                migrations.append(f"⚠️ user_id en apartments: {e}")
+            
+            # Migración 2: Crear tabla users si no existe
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                        email VARCHAR(255) UNIQUE NOT NULL,
+                        full_name VARCHAR(255) NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        phone VARCHAR(50),
+                        company VARCHAR(255),
+                        is_active BOOLEAN DEFAULT true,
+                        is_admin BOOLEAN DEFAULT false,
+                        last_login TIMESTAMP WITH TIME ZONE,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                    )
+                """))
+                migrations.append("✅ Tabla users creada/verificada")
+            except Exception as e:
+                migrations.append(f"⚠️ Tabla users: {e}")
+            
+            # Migración 3: Agregar foreign key si no existe
+            try:
+                conn.execute(text("""
+                    ALTER TABLE apartments 
+                    ADD CONSTRAINT IF NOT EXISTS apartments_user_id_fkey 
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+                """))
+                migrations.append("✅ Foreign key apartments->users agregada")
+            except Exception as e:
+                migrations.append(f"⚠️ Foreign key: {e}")
+            
+            # Migración 4: Verificar otras tablas
+            tables_to_check = ["expenses", "incomes", "reservations"]
+            for table in tables_to_check:
+                try:
+                    result = conn.execute(text(f"SELECT COUNT(*) FROM {table} LIMIT 1"))
+                    count = result.scalar()
+                    migrations.append(f"✅ Tabla {table}: {count} registros")
+                except Exception as e:
+                    migrations.append(f"❌ Tabla {table}: {e}")
+            
+            conn.commit()
+        
+        return {
+            "success": True,
+            "message": "✅ Migración completada",
+            "migrations": migrations,
+            "next_step": "Usar /init-postgres-tables para crear datos demo"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "❌ Error en migración"
+        }
+
 @app.get("/test-postgres")
 def test_postgres_direct():
     """Probar conexión directa a PostgreSQL"""
