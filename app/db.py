@@ -68,38 +68,41 @@ except Exception as e:
 # ------------------------------------------------------------
 connect_args = {}
 
-# Crear engine y probar conexión
-try:
-    if "postgresql" in DATABASE_URL:
-        print("[DB] 🐘 Intentando PostgreSQL...")
-        connect_args = {"connect_timeout": 30, "application_name": "ses-gastos"}
-        engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
-    else:
-        print("[DB] 📁 Configurando SQLite...")
-        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-    
-    # Test básico de conexión
-    from sqlalchemy import text
-    with engine.connect() as conn:
-        conn.execute(text("SELECT 1"))
-    
-    if "postgresql" in DATABASE_URL:
-        print("[DB] ✅ PostgreSQL conectado exitosamente")
-    else:
-        print("[DB] ✅ SQLite conectado exitosamente")
+# Forzar uso de PostgreSQL si está disponible
+if "postgresql" in DATABASE_URL:
+    print("[DB] 🐘 Forzando PostgreSQL...")
+    try:
+        # Configuración optimizada para Render PostgreSQL
+        connect_args = {
+            "connect_timeout": 60,
+            "application_name": "ses-gastos-render"
+        }
         
-except Exception as e:
-    print(f"[DB] ❌ Error: {type(e).__name__}: {e}")
-    
-    # Fallback a SQLite si PostgreSQL falla
-    if "postgresql" in DATABASE_URL:
-        print("[DB] 🔄 Fallback a SQLite...")
+        engine = create_engine(
+            DATABASE_URL, 
+            pool_pre_ping=True, 
+            connect_args=connect_args,
+            pool_timeout=60,
+            pool_recycle=3600,
+            echo=False
+        )
+        
+        # Test de conexión inmediato
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            version = conn.execute(text("SELECT version()")).scalar()
+            print(f"[DB] ✅ PostgreSQL FUNCIONANDO: {version.split()[1]}")
+            
+    except Exception as pg_error:
+        print(f"[DB] ❌ PostgreSQL falló: {pg_error}")
+        print("[DB] 🔄 Usando SQLite como fallback...")
         db_dir = os.getenv("SQLITE_DIR", "/tmp")
         DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos.db"
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
         print(f"[DB] SQLite: {db_dir}/ses_gastos.db")
-    else:
-        raise e
+else:
+    print("[DB] 📁 Usando SQLite...")
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
