@@ -194,6 +194,56 @@ def on_shutdown() -> None:
 def health():
     return {"ok": True}
 
+@app.post("/force-postgres")
+def force_postgres_connection():
+    """Forzar cambio a PostgreSQL en tiempo real"""
+    import os
+    from sqlalchemy import create_engine, text
+    from app.db import SessionLocal
+    
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url or "postgresql" not in database_url:
+        return {"error": "DATABASE_URL PostgreSQL no configurada"}
+    
+    try:
+        # Crear nuevo engine PostgreSQL
+        pg_engine = create_engine(
+            database_url, 
+            pool_pre_ping=True,
+            connect_args={"connect_timeout": 30, "application_name": "ses-gastos-force"}
+        )
+        
+        # Test de conexión
+        with pg_engine.connect() as conn:
+            version = conn.execute(text("SELECT version()")).scalar()
+            
+        # Crear tablas si no existen
+        from app.db import Base
+        from app import models  # Importar modelos
+        Base.metadata.create_all(bind=pg_engine)
+        
+        # Actualizar engine global (¡PELIGROSO pero necesario!)
+        import app.db
+        from sqlalchemy.orm import sessionmaker
+        app.db.engine = pg_engine
+        app.db.DATABASE_URL = database_url
+        app.db.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=pg_engine)
+        
+        return {
+            "success": True,
+            "message": "✅ PostgreSQL forzado exitosamente",
+            "database_url": database_url.replace(database_url.split('@')[0].split(':')[-1], '***'),
+            "postgres_version": version.split()[1],
+            "warning": "Cambio aplicado en tiempo real - puede requerir reinicio para estabilidad"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "❌ No se pudo forzar PostgreSQL"
+        }
+
 @app.get("/test-postgres")
 def test_postgres_direct():
     """Probar conexión directa a PostgreSQL"""
