@@ -33,11 +33,39 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Crear/migrar tablas al arrancar
 @app.on_event("startup")
 def on_startup() -> None:
+    # Intentar reconectar a PostgreSQL si es posible
+    global engine
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if database_url and "postgresql" in database_url:
+            print("[startup] 🔄 Intentando reconectar a PostgreSQL...")
+            from sqlalchemy import create_engine, text
+            
+            pg_engine = create_engine(
+                database_url, 
+                pool_pre_ping=True,
+                connect_args={"connect_timeout": 30, "application_name": "ses-gastos"}
+            )
+            
+            # Test de conexión
+            with pg_engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            
+            # Si llegamos aquí, PostgreSQL funciona
+            engine = pg_engine
+            print("[startup] ✅ PostgreSQL reconectado exitosamente")
+        else:
+            print("[startup] 📁 Continuando con SQLite")
+            
+    except Exception as pg_error:
+        print(f"[startup] ❌ PostgreSQL falló en startup: {pg_error}")
+        print("[startup] 📁 Continuando con SQLite")
+    
     try:
         Base.metadata.create_all(bind=engine)
-        print("[startup] DB ready")
+        print("[startup] ✅ Tablas creadas/verificadas")
     except Exception as e:
-        print(f"[startup] create_all failed: {e}")
+        print(f"[startup] ❌ Error creando tablas: {e}")
     
     # Inicializar apartamentos básicos si no existen
     try:
