@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Apartamentos - SES.GASTOS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 1.8em;
+        }
+        
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+        
+        .btn-back:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+        
+        .actions-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+        }
+        
+        .btn-success:hover {
+            background: #229954;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .apartments-grid {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .apartment-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        
+        .apartment-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .apartment-header {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .apartment-header.inactive {
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+        }
+        
+        .apartment-code {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        
+        .apartment-status {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+        
+        .apartment-body {
+            padding: 20px;
+        }
+        
+        .apartment-info {
+            margin-bottom: 15px;
+        }
+        
+        .apartment-info strong {
+            color: #2c3e50;
+        }
+        
+        .apartment-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 0.9em;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            background: #3498db;
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ecf0f1;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .modal-footer {
+            padding: 20px;
+            text-align: right;
+            border-top: 1px solid #ecf0f1;
+        }
+        
+        .close {
+            color: white;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        
+        .close:hover {
+            opacity: 1;
+        }
+        
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .alert-danger {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .actions-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .apartment-header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            
+            .apartment-actions {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>🏠 Gestión de Apartamentos</h1>
+            <a href="/admin/manage/" class="btn-back">← Volver al Panel</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div id="alert" class="alert"></div>
+        
+        <div class="actions-bar">
+            <div>
+                <h3>Total: <span id="apartments-count">{{ apartments|length }}</span> apartamentos</h3>
+            </div>
+            <button class="btn btn-success" onclick="openCreateModal()">
+                ➕ Nuevo Apartamento
+            </button>
+        </div>
+        
+        <div class="apartments-grid" id="apartments-grid">
+            {% for apartment in apartments %}
+            <div class="apartment-card" data-apartment-id="{{ apartment.id }}">
+                <div class="apartment-header {% if not apartment.is_active %}inactive{% endif %}">
+                    <div>
+                        <div class="apartment-code">{{ apartment.code }}</div>
+                        <div>{{ apartment.name or 'Sin nombre' }}</div>
+                    </div>
+                    <div class="apartment-status">
+                        {% if apartment.is_active %}✅ Activo{% else %}❌ Inactivo{% endif %}
+                    </div>
+                </div>
+                <div class="apartment-body">
+                    <div class="apartment-info">
+                        <strong>Propietario:</strong> {{ apartment.owner_email or 'No especificado' }}
+                    </div>
+                    <div class="apartment-info">
+                        <strong>Creado:</strong> {{ apartment.created_at.strftime('%d/%m/%Y %H:%M') if apartment.created_at else 'N/A' }}
+                    </div>
+                    <div class="apartment-actions">
+                        <button class="btn btn-sm" onclick="editApartment('{{ apartment.id }}', '{{ apartment.code }}', '{{ apartment.name or '' }}', '{{ apartment.owner_email or '' }}', {{ apartment.is_active|lower }})">
+                            ✏️ Editar
+                        </button>
+                        <a href="/admin/manage/expenses?apartment_id={{ apartment.id }}" class="btn btn-sm" style="background: #f39c12;">
+                            💰 Gastos
+                        </a>
+                        <a href="/admin/manage/incomes?apartment_id={{ apartment.id }}" class="btn btn-sm" style="background: #27ae60;">
+                            📈 Ingresos
+                        </a>
+                        <button class="btn btn-sm btn-danger" onclick="deleteApartment('{{ apartment.id }}', '{{ apartment.code }}')">
+                            🗑️ Eliminar
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Modal Crear/Editar Apartamento -->
+    <div id="apartmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h3 id="modal-title">Nuevo Apartamento</h3>
+            </div>
+            <div class="modal-body">
+                <form id="apartmentForm">
+                    <div class="form-group">
+                        <label for="code">Código del Apartamento *</label>
+                        <input type="text" id="code" name="code" required placeholder="Ej: APT001">
+                    </div>
+                    <div class="form-group">
+                        <label for="name">Nombre del Apartamento *</label>
+                        <input type="text" id="name" name="name" required placeholder="Ej: Apartamento Centro">
+                    </div>
+                    <div class="form-group">
+                        <label for="owner_email">Email del Propietario *</label>
+                        <input type="email" id="owner_email" name="owner_email" required placeholder="propietario@email.com">
+                    </div>
+                    <div class="form-group" id="is_active_group" style="display: none;">
+                        <label for="is_active">Estado</label>
+                        <select id="is_active" name="is_active">
+                            <option value="true">Activo</option>
+                            <option value="false">Inactivo</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="saveApartment()" id="save-btn">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let editingApartmentId = null;
+        
+        function getAdminKey() {
+            let key = localStorage.getItem('admin_key');
+            if (!key) {
+                key = prompt('Introduce la clave de administrador:');
+                if (key) {
+                    localStorage.setItem('admin_key', key);
+                }
+            }
+            return key || '';
+        }
+        
+        function showAlert(message, type = 'success') {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+        
+        function openCreateModal() {
+            editingApartmentId = null;
+            document.getElementById('modal-title').textContent = 'Nuevo Apartamento';
+            document.getElementById('apartmentForm').reset();
+            document.getElementById('code').disabled = false;
+            document.getElementById('is_active_group').style.display = 'none';
+            document.getElementById('apartmentModal').style.display = 'block';
+        }
+        
+        function editApartment(id, code, name, email, isActive) {
+            editingApartmentId = id;
+            document.getElementById('modal-title').textContent = 'Editar Apartamento';
+            document.getElementById('code').value = code;
+            document.getElementById('code').disabled = true;
+            document.getElementById('name').value = name;
+            document.getElementById('owner_email').value = email;
+            document.getElementById('is_active').value = isActive.toString();
+            document.getElementById('is_active_group').style.display = 'block';
+            document.getElementById('apartmentModal').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('apartmentModal').style.display = 'none';
+        }
+        
+        async function saveApartment() {
+            const form = document.getElementById('apartmentForm');
+            const formData = new FormData(form);
+            
+            const adminKey = getAdminKey();
+            if (!adminKey) {
+                showAlert('Clave de administrador requerida', 'danger');
+                return;
+            }
+            
+            try {
+                let url, method;
+                if (editingApartmentId) {
+                    url = `/admin/manage/api/apartments/${editingApartmentId}?key=${encodeURIComponent(adminKey)}`;
+                    method = 'PUT';
+                } else {
+                    url = `/admin/manage/api/apartments?key=${encodeURIComponent(adminKey)}`;
+                    method = 'POST';
+                }
+                
+                const response = await fetch(url, {
+                    method: method,
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(data.message, 'success');
+                    closeModal();
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(data.detail || 'Error guardando apartamento', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error de conexión', 'danger');
+            }
+        }
+        
+        async function deleteApartment(id, code) {
+            if (!confirm(`¿Estás seguro de que quieres eliminar el apartamento ${code}?`)) {
+                return;
+            }
+            
+            const adminKey = getAdminKey();
+            if (!adminKey) {
+                showAlert('Clave de administrador requerida', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/manage/api/apartments/${id}?key=${encodeURIComponent(adminKey)}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    if (data.success) {
+                        showAlert(data.message, 'success');
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        showAlert(data.message, 'danger');
+                    }
+                } else {
+                    showAlert(data.detail || 'Error eliminando apartamento', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error de conexión', 'danger');
+            }
+        }
+        
+        // Cerrar modal al hacer clic fuera
+        window.onclick = function(event) {
+            const modal = document.getElementById('apartmentModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -11,7 +11,7 @@ from .db import Base, engine
 
 # Importaciones básicas primero
 try:
-    from .routers import auth, apartments, incomes, reservations, expenses, admin, public, user_dashboard, email_setup, email_webhooks, vectors
+    from .routers import auth, apartments, incomes, reservations, expenses, admin, public, user_dashboard, email_setup, email_webhooks, vectors, admin_management
     print("[import] ✅ Routers básicos importados")
 except Exception as e:
     print(f"[import] ❌ Error en routers básicos: {e}")
@@ -651,6 +651,12 @@ try:
     print("[router] ✅ Vectors router incluido")
 except Exception as e:
     print(f"[router] ❌ Error incluyendo vectors: {e}")
+
+try:
+    app.include_router(admin_management.router)
+    print("[router] ✅ Admin management router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo admin_management: {e}")
 
 # Agregar webhook de Telegram para producción
 try:

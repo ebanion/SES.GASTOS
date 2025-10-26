@@ -87,6 +87,23 @@ class IncomeFromReservationIn(BaseModel):
     apartment_id: Optional[str] = None
     source: Optional[str] = "reservation"
 
+class IncomeCreate(BaseModel):
+    """Schema para crear ingresos manualmente"""
+    reservation_id: Optional[str] = None
+    apartment_id: str
+    date: date
+    amount_gross: Decimal = Field(gt=0)
+    currency: str = "EUR"
+    status: Optional[Literal["PENDING", "CONFIRMED", "CANCELLED"]] = "PENDING"
+    non_refundable_at: Optional[date] = None
+    source: Optional[str] = "manual"
+    guest_name: Optional[str] = None
+    guest_email: Optional[str] = None
+    booking_reference: Optional[str] = None
+    check_in_date: Optional[date] = None
+    check_out_date: Optional[date] = None
+    guests_count: Optional[int] = None
+
 class IncomeOut(BaseModel):
     id: str  # UUID expuesto como string
     reservation_id: Optional[str] = None

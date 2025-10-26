@@ -333,3 +333,187 @@ def get_upcoming_checkins(
         "total_checkins": len(checkins)
     }
 
+# ============ NUEVAS RUTAS CRUD PARA ADMINISTRACIÓN ============
+
+@router.post("", response_model=schemas.IncomeOut, dependencies=[Depends(require_internal_key)])
+def create_income(payload: schemas.IncomeCreate, db: Session = Depends(get_db)):
+    """Crear nuevo ingreso"""
+    # Verificar que el apartamento existe
+    apt = db.query(models.Apartment).filter(models.Apartment.id == payload.apartment_id).first()
+    if not apt:
+        raise HTTPException(status_code=404, detail="apartment_not_found")
+    
+    # Verificar reserva si se proporciona
+    if payload.reservation_id:
+        reservation = db.query(models.Reservation).filter(models.Reservation.id == payload.reservation_id).first()
+        if not reservation:
+            raise HTTPException(status_code=404, detail="reservation_not_found")
+    
+    income = models.Income(
+        reservation_id=payload.reservation_id,
+        apartment_id=payload.apartment_id,
+        date=payload.date,
+        amount_gross=payload.amount_gross,
+        currency=payload.currency,
+        status=payload.status or "PENDING",
+        non_refundable_at=payload.non_refundable_at,
+        source=payload.source or "manual",
+        guest_name=payload.guest_name,
+        guest_email=payload.guest_email,
+        booking_reference=payload.booking_reference,
+        check_in_date=payload.check_in_date,
+        check_out_date=payload.check_out_date,
+        guests_count=payload.guests_count,
+    )
+    
+    try:
+        db.add(income)
+        db.commit()
+        db.refresh(income)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"create_error: {str(e)}")
+    
+    return _to_out(income)
+
+@router.get("/{income_id}", response_model=schemas.IncomeOut)
+def get_income(income_id: str, db: Session = Depends(get_db)):
+    """Obtener ingreso por ID"""
+    income = db.query(models.Income).filter(models.Income.id == income_id).first()
+    if not income:
+        raise HTTPException(status_code=404, detail="income_not_found")
+    
+    return _to_out(income)
+
+@router.put("/{income_id}", response_model=schemas.IncomeOut, dependencies=[Depends(require_internal_key)])
+def update_income(income_id: str, payload: schemas.IncomeCreate, db: Session = Depends(get_db)):
+    """Actualizar ingreso completo"""
+    income = db.query(models.Income).filter(models.Income.id == income_id).first()
+    if not income:
+        raise HTTPException(status_code=404, detail="income_not_found")
+    
+    # Verificar apartamento
+    apt = db.query(models.Apartment).filter(models.Apartment.id == payload.apartment_id).first()
+    if not apt:
+        raise HTTPException(status_code=404, detail="apartment_not_found")
+    
+    # Verificar reserva si se proporciona
+    if payload.reservation_id:
+        reservation = db.query(models.Reservation).filter(models.Reservation.id == payload.reservation_id).first()
+        if not reservation:
+            raise HTTPException(status_code=404, detail="reservation_not_found")
+    
+    # Actualizar campos
+    income.reservation_id = payload.reservation_id
+    income.apartment_id = payload.apartment_id
+    income.date = payload.date
+    income.amount_gross = payload.amount_gross
+    income.currency = payload.currency
+    income.status = payload.status or income.status
+    income.non_refundable_at = payload.non_refundable_at
+    income.source = payload.source or income.source
+    income.guest_name = payload.guest_name
+    income.guest_email = payload.guest_email
+    income.booking_reference = payload.booking_reference
+    income.check_in_date = payload.check_in_date
+    income.check_out_date = payload.check_out_date
+    income.guests_count = payload.guests_count
+    
+    try:
+        db.commit()
+        db.refresh(income)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"update_error: {str(e)}")
+    
+    return _to_out(income)
+
+@router.patch("/{income_id}", response_model=schemas.IncomeOut, dependencies=[Depends(require_internal_key)])
+def patch_income(income_id: str, updates: dict, db: Session = Depends(get_db)):
+    """Actualizar ingreso parcialmente"""
+    income = db.query(models.Income).filter(models.Income.id == income_id).first()
+    if not income:
+        raise HTTPException(status_code=404, detail="income_not_found")
+    
+    # Campos permitidos para actualizar
+    allowed_fields = {
+        "reservation_id", "apartment_id", "date", "amount_gross", "currency", 
+        "status", "non_refundable_at", "source", "guest_name", "guest_email",
+        "booking_reference", "check_in_date", "check_out_date", "guests_count"
+    }
+    
+    for field, value in updates.items():
+        if field in allowed_fields and hasattr(income, field):
+            # Validaciones especiales
+            if field == "apartment_id" and value:
+                apt = db.query(models.Apartment).filter(models.Apartment.id == str(value)).first()
+                if not apt:
+                    raise HTTPException(status_code=404, detail="apartment_not_found")
+            elif field == "reservation_id" and value:
+                reservation = db.query(models.Reservation).filter(models.Reservation.id == str(value)).first()
+                if not reservation:
+                    raise HTTPException(status_code=404, detail="reservation_not_found")
+            
+            setattr(income, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(income)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"patch_error: {str(e)}")
+    
+    return _to_out(income)
+
+@router.delete("/{income_id}", dependencies=[Depends(require_internal_key)])
+def delete_income(income_id: str, db: Session = Depends(get_db)):
+    """Eliminar ingreso"""
+    income = db.query(models.Income).filter(models.Income.id == income_id).first()
+    if not income:
+        raise HTTPException(status_code=404, detail="income_not_found")
+    
+    # Guardar información para la respuesta
+    income_info = {
+        "id": str(income.id),
+        "apartment_id": income.apartment_id,
+        "date": str(income.date),
+        "amount_gross": float(income.amount_gross),
+        "status": income.status,
+        "guest_name": income.guest_name,
+        "booking_reference": income.booking_reference
+    }
+    
+    try:
+        db.delete(income)
+        db.commit()
+        return {
+            "success": True,
+            "message": "Ingreso eliminado exitosamente",
+            "deleted_income": income_info
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"delete_error: {str(e)}")
+
+@router.get("/by-apartment/{apartment_id}")
+def get_incomes_by_apartment(apartment_id: str, db: Session = Depends(get_db)):
+    """Obtener todos los ingresos de un apartamento específico"""
+    # Verificar que el apartamento existe
+    apt = db.query(models.Apartment).filter(models.Apartment.id == apartment_id).first()
+    if not apt:
+        raise HTTPException(status_code=404, detail="apartment_not_found")
+    
+    incomes = db.query(models.Income).filter(
+        models.Income.apartment_id == apartment_id
+    ).order_by(models.Income.date.desc()).all()
+    
+    return {
+        "apartment": {
+            "id": apt.id,
+            "code": apt.code,
+            "name": apt.name
+        },
+        "incomes": [_to_detailed_out(income) for income in incomes],
+        "total": len(incomes)
+    }
+

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - SES.GASTOS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            text-align: center;
+            border-left: 4px solid #3498db;
+        }
+        
+        .stat-card.apartments { border-left-color: #e74c3c; }
+        .stat-card.expenses { border-left-color: #f39c12; }
+        .stat-card.incomes { border-left-color: #27ae60; }
+        .stat-card.net { border-left-color: #9b59b6; }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+        
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            padding: 30px;
+        }
+        
+        .action-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        
+        .action-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .action-header {
+            padding: 20px;
+            color: white;
+            text-align: center;
+        }
+        
+        .action-header.apartments { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .action-header.expenses { background: linear-gradient(135deg, #f39c12, #e67e22); }
+        .action-header.incomes { background: linear-gradient(135deg, #27ae60, #229954); }
+        
+        .action-header h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+        
+        .action-body {
+            padding: 25px;
+        }
+        
+        .action-body p {
+            color: #7f8c8d;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 25px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 500;
+            transition: background 0.3s ease;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .btn.apartments { background: #e74c3c; }
+        .btn.apartments:hover { background: #c0392b; }
+        
+        .btn.expenses { background: #f39c12; }
+        .btn.expenses:hover { background: #e67e22; }
+        
+        .btn.incomes { background: #27ae60; }
+        .btn.incomes:hover { background: #229954; }
+        
+        .footer {
+            background: #34495e;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .stats-grid,
+            .actions-grid {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Panel de Administración</h1>
+            <p>Gestión completa de apartamentos, gastos e ingresos</p>
+        </div>
+        
+        <div class="stats-grid" id="stats-grid">
+            <div class="loading">📊 Cargando estadísticas...</div>
+        </div>
+        
+        <div class="actions-grid">
+            <div class="action-card">
+                <div class="action-header apartments">
+                    <h3>🏠 Apartamentos</h3>
+                    <p>Gestionar propiedades</p>
+                </div>
+                <div class="action-body">
+                    <p>Crear, editar y eliminar apartamentos. Gestionar códigos únicos y propietarios.</p>
+                    <a href="/admin/manage/apartments" class="btn apartments">Gestionar Apartamentos</a>
+                </div>
+            </div>
+            
+            <div class="action-card">
+                <div class="action-header expenses">
+                    <h3>💰 Gastos</h3>
+                    <p>Gestionar gastos</p>
+                </div>
+                <div class="action-body">
+                    <p>Crear gastos manualmente, editar existentes y eliminar registros incorrectos.</p>
+                    <a href="/admin/manage/expenses" class="btn expenses">Gestionar Gastos</a>
+                </div>
+            </div>
+            
+            <div class="action-card">
+                <div class="action-header incomes">
+                    <h3>📈 Ingresos</h3>
+                    <p>Gestionar ingresos</p>
+                </div>
+                <div class="action-body">
+                    <p>Crear ingresos, cambiar estados y gestionar reservas de huéspedes.</p>
+                    <a href="/admin/manage/incomes" class="btn incomes">Gestionar Ingresos</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>SES.GASTOS - Sistema de Gestión de Apartamentos</p>
+            <p><a href="/api/v1/dashboard/" style="color: #3498db;">📊 Ver Dashboard</a> | 
+               <a href="/admin/apartments" style="color: #3498db;">⚙️ Panel Técnico</a> | 
+               <a href="/docs" style="color: #3498db;">📚 API Docs</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Cargar estadísticas
+        async function loadStats() {
+            try {
+                const response = await fetch('/admin/manage/api/stats?key=' + encodeURIComponent(getAdminKey()));
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayStats(data);
+                } else {
+                    document.getElementById('stats-grid').innerHTML = 
+                        '<div class="loading">❌ Error cargando estadísticas: ' + (data.detail || 'Error desconocido') + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('stats-grid').innerHTML = 
+                    '<div class="loading">❌ Error de conexión</div>';
+            }
+        }
+        
+        function displayStats(data) {
+            const statsHtml = `
+                <div class="stat-card apartments">
+                    <div class="stat-number">${data.totals.active_apartments}</div>
+                    <div class="stat-label">Apartamentos Activos</div>
+                </div>
+                <div class="stat-card expenses">
+                    <div class="stat-number">€${data.monthly.expenses_sum.toFixed(2)}</div>
+                    <div class="stat-label">Gastos del Mes</div>
+                </div>
+                <div class="stat-card incomes">
+                    <div class="stat-number">€${data.monthly.incomes_sum.toFixed(2)}</div>
+                    <div class="stat-label">Ingresos del Mes</div>
+                </div>
+                <div class="stat-card net">
+                    <div class="stat-number">€${data.monthly.net.toFixed(2)}</div>
+                    <div class="stat-label">Beneficio Neto</div>
+                </div>
+            `;
+            document.getElementById('stats-grid').innerHTML = statsHtml;
+        }
+        
+        function getAdminKey() {
+            // Intentar obtener la clave de admin de localStorage o prompt
+            let key = localStorage.getItem('admin_key');
+            if (!key) {
+                key = prompt('Introduce la clave de administrador:');
+                if (key) {
+                    localStorage.setItem('admin_key', key);
+                }
+            }
+            return key || '';
+        }
+        
+        // Cargar estadísticas al cargar la página
+        loadStats();
+    </script>
+</body>
+</html>

@@ -102,5 +102,185 @@ def list_expenses(
         for r in rows
     ]
 
+@router.get("/{expense_id}", response_model=schemas.ExpenseOut)
+def get_expense(expense_id: str, db: Session = Depends(get_db)):
+    """Obtener gasto por ID"""
+    expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="expense_not_found")
+    
+    return schemas.ExpenseOut(
+        id=expense.id,
+        apartment_id=expense.apartment_id,
+        date=expense.date,
+        amount_gross=expense.amount_gross,
+        currency=expense.currency,
+        category=expense.category,
+        description=expense.description,
+        vendor=expense.vendor,
+        invoice_number=expense.invoice_number,
+        source=expense.source,
+        vat_rate=expense.vat_rate,
+        file_url=expense.file_url,
+        status=expense.status,
+    )
+
+@router.put("/{expense_id}", response_model=schemas.ExpenseOut, dependencies=[Depends(require_internal_key)])
+def update_expense(expense_id: str, payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
+    """Actualizar gasto completo"""
+    expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="expense_not_found")
+    
+    # Verificar que el apartamento existe
+    apt = db.query(models.Apartment).filter(models.Apartment.id == str(payload.apartment_id)).first()
+    if not apt:
+        raise HTTPException(status_code=404, detail="apartment_not_found")
+    
+    # Actualizar todos los campos
+    expense.apartment_id = str(payload.apartment_id)
+    expense.date = payload.date
+    expense.amount_gross = payload.amount_gross
+    expense.currency = payload.currency
+    expense.category = payload.category
+    expense.description = payload.description
+    expense.vendor = payload.vendor
+    expense.invoice_number = payload.invoice_number
+    expense.source = payload.source
+    expense.vat_rate = payload.vat_rate
+    expense.file_url = payload.file_url
+    expense.status = payload.status
+    
+    try:
+        db.commit()
+        db.refresh(expense)
+    except SQLAlchemyError as ex:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"update_error: {str(ex.orig) if hasattr(ex, 'orig') else str(ex)}")
+    
+    return schemas.ExpenseOut(
+        id=expense.id,
+        apartment_id=expense.apartment_id,
+        date=expense.date,
+        amount_gross=expense.amount_gross,
+        currency=expense.currency,
+        category=expense.category,
+        description=expense.description,
+        vendor=expense.vendor,
+        invoice_number=expense.invoice_number,
+        source=expense.source,
+        vat_rate=expense.vat_rate,
+        file_url=expense.file_url,
+        status=expense.status,
+    )
+
+@router.patch("/{expense_id}", response_model=schemas.ExpenseOut, dependencies=[Depends(require_internal_key)])
+def patch_expense(expense_id: str, updates: dict, db: Session = Depends(get_db)):
+    """Actualizar gasto parcialmente"""
+    expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="expense_not_found")
+    
+    # Campos permitidos para actualizar
+    allowed_fields = {
+        "apartment_id", "date", "amount_gross", "currency", "category", 
+        "description", "vendor", "invoice_number", "source", "vat_rate", 
+        "file_url", "status"
+    }
+    
+    for field, value in updates.items():
+        if field in allowed_fields and hasattr(expense, field):
+            # Validar apartamento si se está cambiando
+            if field == "apartment_id" and value:
+                apt = db.query(models.Apartment).filter(models.Apartment.id == str(value)).first()
+                if not apt:
+                    raise HTTPException(status_code=404, detail="apartment_not_found")
+                setattr(expense, field, str(value))
+            else:
+                setattr(expense, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(expense)
+    except SQLAlchemyError as ex:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"patch_error: {str(ex.orig) if hasattr(ex, 'orig') else str(ex)}")
+    
+    return schemas.ExpenseOut(
+        id=expense.id,
+        apartment_id=expense.apartment_id,
+        date=expense.date,
+        amount_gross=expense.amount_gross,
+        currency=expense.currency,
+        category=expense.category,
+        description=expense.description,
+        vendor=expense.vendor,
+        invoice_number=expense.invoice_number,
+        source=expense.source,
+        vat_rate=expense.vat_rate,
+        file_url=expense.file_url,
+        status=expense.status,
+    )
+
+@router.delete("/{expense_id}", dependencies=[Depends(require_internal_key)])
+def delete_expense(expense_id: str, db: Session = Depends(get_db)):
+    """Eliminar gasto"""
+    expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="expense_not_found")
+    
+    # Guardar información para la respuesta
+    expense_info = {
+        "id": expense.id,
+        "apartment_id": expense.apartment_id,
+        "date": str(expense.date),
+        "amount_gross": float(expense.amount_gross),
+        "description": expense.description,
+        "vendor": expense.vendor
+    }
+    
+    try:
+        db.delete(expense)
+        db.commit()
+        return {
+            "success": True,
+            "message": f"Gasto eliminado exitosamente",
+            "deleted_expense": expense_info
+        }
+    except SQLAlchemyError as ex:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"delete_error: {str(ex.orig) if hasattr(ex, 'orig') else str(ex)}")
+
+@router.get("/by-apartment/{apartment_id}", response_model=list[schemas.ExpenseOut])
+def get_expenses_by_apartment(apartment_id: str, db: Session = Depends(get_db)):
+    """Obtener todos los gastos de un apartamento específico"""
+    # Verificar que el apartamento existe
+    apt = db.query(models.Apartment).filter(models.Apartment.id == apartment_id).first()
+    if not apt:
+        raise HTTPException(status_code=404, detail="apartment_not_found")
+    
+    expenses = db.query(models.Expense).filter(
+        models.Expense.apartment_id == apartment_id
+    ).order_by(models.Expense.date.desc()).all()
+    
+    return [
+        schemas.ExpenseOut(
+            id=expense.id,
+            apartment_id=expense.apartment_id,
+            date=expense.date,
+            amount_gross=expense.amount_gross,
+            currency=expense.currency,
+            category=expense.category,
+            description=expense.description,
+            vendor=expense.vendor,
+            invoice_number=expense.invoice_number,
+            source=expense.source,
+            vat_rate=expense.vat_rate,
+            file_url=expense.file_url,
+            status=expense.status,
+        )
+        for expense in expenses
+    ]
+
 
 
