@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arreglar PostgreSQL - SES.GASTOS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            color: #2c3e50;
+        }
+        .header {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .content {
+            padding: 30px;
+        }
+        .status {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background: #e74c3c;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 10px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+        .btn-success {
+            background: #27ae60;
+        }
+        .btn-success:hover {
+            background: #229954;
+        }
+        .btn-warning {
+            background: #f39c12;
+        }
+        .btn-warning:hover {
+            background: #e67e22;
+        }
+        .result {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        pre {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        .step {
+            background: #ecf0f1;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #3498db;
+        }
+        .step h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .progress {
+            background: #ecf0f1;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            background: #3498db;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Arreglar PostgreSQL</h1>
+            <p>Diagnóstico y reparación automática de la base de datos</p>
+        </div>
+        
+        <div class="content">
+            <div class="status">
+                <h3>📊 Estado Actual</h3>
+                <div id="current-status" class="loading">🔄 Verificando estado...</div>
+            </div>
+            
+            <div class="step">
+                <h4>🔍 Paso 1: Diagnóstico</h4>
+                <p>Verificar el estado actual de la base de datos y las variables de entorno disponibles.</p>
+                <button onclick="checkStatus()" class="btn btn-warning">
+                    🔍 Verificar Estado
+                </button>
+                <div id="status-result" class="result"></div>
+            </div>
+            
+            <div class="step">
+                <h4>🔧 Paso 2: Reparación Automática</h4>
+                <p>Probar todas las URLs de PostgreSQL disponibles y reconectar automáticamente.</p>
+                <button onclick="fixPostgres()" class="btn">
+                    🚀 Arreglar PostgreSQL
+                </button>
+                <div id="fix-result" class="result"></div>
+            </div>
+            
+            <div class="step">
+                <h4>📊 Paso 3: Verificación</h4>
+                <p>Confirmar que PostgreSQL está funcionando y verificar los datos.</p>
+                <button onclick="verifyFix()" class="btn btn-success">
+                    ✅ Verificar Reparación
+                </button>
+                <div id="verify-result" class="result"></div>
+            </div>
+            
+            <div class="step">
+                <h4>🎯 Paso 4: Probar Panel</h4>
+                <p>Una vez arreglado, probar el panel de administración completo.</p>
+                <button onclick="testPanel()" class="btn btn-success">
+                    🏠 Probar Panel
+                </button>
+                <div id="panel-result" class="result"></div>
+            </div>
+            
+            <div class="status">
+                <h3>🔗 Enlaces Útiles</h3>
+                <a href="https://ses-gastos.onrender.com/api/v1/dashboard/" class="btn btn-success" target="_blank">
+                    📊 Dashboard
+                </a>
+                <a href="https://ses-gastos.onrender.com/admin/apartments" class="btn btn-warning" target="_blank">
+                    ⚙️ Panel Técnico
+                </a>
+                <a href="https://ses-gastos.onrender.com/docs" class="btn" target="_blank">
+                    📚 API Docs
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Cargar estado inicial
+        checkStatus();
+        
+        async function checkStatus() {
+            const result = document.getElementById('status-result');
+            const currentStatus = document.getElementById('current-status');
+            
+            result.style.display = 'block';
+            result.className = 'result loading';
+            result.innerHTML = '🔄 Verificando estado de la base de datos...';
+            
+            try {
+                const response = await fetch('https://ses-gastos.onrender.com/db-status');
+                const data = await response.json();
+                
+                let html = '<h4>📊 Estado de la Base de Datos</h4>';
+                
+                if (data.database === 'connected') {
+                    if (data.database_type === 'postgresql') {
+                        result.className = 'result success';
+                        html += '<p><strong>✅ PostgreSQL conectado correctamente</strong></p>';
+                        currentStatus.innerHTML = '✅ PostgreSQL funcionando';
+                    } else {
+                        result.className = 'result warning';
+                        html += '<p><strong>⚠️ Usando SQLite como fallback</strong></p>';
+                        currentStatus.innerHTML = '⚠️ SQLite temporal (PostgreSQL falló)';
+                    }
+                    
+                    html += `<p><strong>URL:</strong> ${data.database_url}</p>`;
+                    html += '<h5>Variables de entorno:</h5><ul>';
+                    
+                    Object.entries(data.environment_vars).forEach(([key, value]) => {
+                        const status = value === 'NOT_SET' ? '❌' : '✅';
+                        html += `<li>${status} <strong>${key}:</strong> ${value}</li>`;
+                    });
+                    
+                    html += '</ul>';
+                } else {
+                    result.className = 'result error';
+                    html += `<p><strong>❌ Error de conexión:</strong> ${data.error}</p>`;
+                    currentStatus.innerHTML = '❌ Base de datos desconectada';
+                }
+                
+                result.innerHTML = html;
+                
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `<h4>❌ Error</h4><p>No se pudo verificar el estado: ${error.message}</p>`;
+                currentStatus.innerHTML = '❌ Error de conexión';
+            }
+        }
+        
+        async function fixPostgres() {
+            const result = document.getElementById('fix-result');
+            
+            result.style.display = 'block';
+            result.className = 'result loading';
+            result.innerHTML = '🔧 Intentando reparar PostgreSQL...';
+            
+            try {
+                const response = await fetch('https://ses-gastos.onrender.com/fix-postgres-now', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                let html = '<h4>🔧 Resultado de la Reparación</h4>';
+                
+                if (data.success) {
+                    result.className = 'result success';
+                    html += `<p><strong>✅ ${data.message}</strong></p>`;
+                    html += `<p><strong>Base de datos:</strong> ${data.database}</p>`;
+                    html += `<p><strong>Versión PostgreSQL:</strong> ${data.postgres_version}</p>`;
+                    html += `<p><strong>Variable usada:</strong> ${data.working_url_var}</p>`;
+                    html += `<p><strong>URL:</strong> ${data.working_url}</p>`;
+                    html += `<p><strong>Tablas:</strong> ${data.tables_created}</p>`;
+                } else {
+                    result.className = 'result error';
+                    html += `<p><strong>❌ ${data.message}</strong></p>`;
+                    html += `<p><strong>Fallback actual:</strong> ${data.current_fallback}</p>`;
+                    html += `<p><strong>Sugerencia:</strong> ${data.suggestion}</p>`;
+                }
+                
+                html += '<h5>Detalles de todas las URLs probadas:</h5><ul>';
+                data.all_results.forEach(result => {
+                    html += `<li>${result}</li>`;
+                });
+                html += '</ul>';
+                
+                result.innerHTML = html;
+                
+                // Si fue exitoso, actualizar estado
+                if (data.success) {
+                    setTimeout(checkStatus, 2000);
+                }
+                
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `<h4>❌ Error</h4><p>No se pudo ejecutar la reparación: ${error.message}</p>
+                    <p><strong>Posible causa:</strong> El endpoint aún no está desplegado. Intenta de nuevo en unos minutos.</p>`;
+            }
+        }
+        
+        async function verifyFix() {
+            const result = document.getElementById('verify-result');
+            
+            result.style.display = 'block';
+            result.className = 'result loading';
+            result.innerHTML = '✅ Verificando reparación...';
+            
+            try {
+                // Verificar estado de la DB
+                const dbResponse = await fetch('https://ses-gastos.onrender.com/db-status');
+                const dbData = await dbResponse.json();
+                
+                // Verificar datos del dashboard
+                const dashResponse = await fetch('https://ses-gastos.onrender.com/api/v1/dashboard/summary-stats?year=2025');
+                const dashData = await dashResponse.json();
+                
+                let html = '<h4>✅ Verificación Completa</h4>';
+                
+                if (dbData.database_type === 'postgresql') {
+                    result.className = 'result success';
+                    html += '<p><strong>✅ PostgreSQL funcionando correctamente</strong></p>';
+                    html += `<p><strong>Ingresos totales:</strong> €${dashData.total_income.toFixed(2)}</p>`;
+                    html += `<p><strong>Gastos totales:</strong> €${dashData.total_expenses.toFixed(2)}</p>`;
+                    html += `<p><strong>Beneficio neto:</strong> €${dashData.net_profit.toFixed(2)}</p>`;
+                    html += '<p><strong>🎉 Sistema completamente operativo con PostgreSQL</strong></p>';
+                } else {
+                    result.className = 'result warning';
+                    html += '<p><strong>⚠️ Aún usando SQLite</strong></p>';
+                    html += '<p>La reparación no se completó. Intenta ejecutar la reparación de nuevo.</p>';
+                }
+                
+                result.innerHTML = html;
+                
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `<h4>❌ Error en verificación</h4><p>${error.message}</p>`;
+            }
+        }
+        
+        async function testPanel() {
+            const result = document.getElementById('panel-result');
+            
+            result.style.display = 'block';
+            result.className = 'result loading';
+            result.innerHTML = '🏠 Probando panel de administración...';
+            
+            try {
+                const response = await fetch('https://ses-gastos.onrender.com/admin/manage/');
+                
+                let html = '<h4>🏠 Estado del Panel</h4>';
+                
+                if (response.status === 200) {
+                    result.className = 'result success';
+                    html += '<p><strong>🎉 ¡Panel de administración disponible!</strong></p>';
+                    html += '<p><a href="https://ses-gastos.onrender.com/admin/manage/" target="_blank" class="btn btn-success">🚀 Ir al Panel Completo</a></p>';
+                } else {
+                    result.className = 'result warning';
+                    html += `<p><strong>⏳ Panel aún no disponible (HTTP ${response.status})</strong></p>`;
+                    html += '<p>El deploy puede estar aún en proceso. Intenta de nuevo en unos minutos.</p>';
+                    html += '<p>Mientras tanto, puedes usar:</p>';
+                    html += '<ul>';
+                    html += '<li><a href="https://ses-gastos.onrender.com/api/v1/dashboard/" target="_blank">📊 Dashboard Completo</a></li>';
+                    html += '<li><a href="https://ses-gastos.onrender.com/admin/apartments" target="_blank">⚙️ Panel Técnico</a></li>';
+                    html += '</ul>';
+                }
+                
+                result.innerHTML = html;
+                
+            } catch (error) {
+                result.className = 'result warning';
+                result.innerHTML = `<h4>⏳ Panel en proceso</h4>
+                    <p>El servidor está reiniciando o el deploy está en proceso.</p>
+                    <p>Esto es normal después de una reparación.</p>`;
+            }
+        }
+        
+        // Auto-verificar cada 2 minutos
+        setInterval(() => {
+            checkStatus();
+        }, 120000);
+    </script>
+</body>
+</html>
