@@ -580,6 +580,141 @@ def db_status():
     except Exception as e:
         return {"database": "disconnected", "error": str(e), "status": "error"}
 
+@app.post("/fix-postgres-now")
+def fix_postgres_now():
+    """Arreglar PostgreSQL probando todas las URLs disponibles"""
+    import os
+    from sqlalchemy import create_engine, text
+    
+    # Obtener todas las posibles URLs de PostgreSQL
+    env_vars = {
+        "DATABASE_URL": os.getenv("DATABASE_URL"),
+        "DATABASE_PRIVATE_URL": os.getenv("DATABASE_PRIVATE_URL"),
+        "POSTGRES_URL": os.getenv("POSTGRES_URL"),
+        "POSTGRESQL_URL": os.getenv("POSTGRESQL_URL")
+    }
+    
+    results = []
+    working_url = None
+    
+    for var_name, url in env_vars.items():
+        if not url:
+            results.append(f"{var_name}: ❌ No configurada")
+            continue
+            
+        if "postgresql" not in url and "postgres" not in url:
+            results.append(f"{var_name}: ❌ No es PostgreSQL")
+            continue
+            
+        try:
+            # Normalizar URL para psycopg
+            test_url = url
+            if test_url.startswith("postgres://"):
+                test_url = test_url.replace("postgres://", "postgresql+psycopg://", 1)
+            elif test_url.startswith("postgresql://"):
+                test_url = test_url.replace("postgresql://", "postgresql+psycopg://", 1)
+            elif not test_url.startswith("postgresql+psycopg://"):
+                test_url = "postgresql+psycopg://" + test_url.split("://", 1)[1]
+            
+            # Probar conexión
+            test_engine = create_engine(
+                test_url, 
+                pool_pre_ping=True,
+                connect_args={"connect_timeout": 10}
+            )
+            
+            with test_engine.connect() as conn:
+                version = conn.execute(text("SELECT version()")).scalar()
+                db_name = conn.execute(text("SELECT current_database()")).scalar()
+                
+            results.append(f"{var_name}: ✅ FUNCIONA - DB: {db_name}")
+            working_url = test_url
+            working_var = var_name
+            
+            # Actualizar engine global
+            global engine
+            from sqlalchemy.orm import sessionmaker
+            import app.db
+            
+            engine = test_engine
+            app.db.engine = test_engine
+            app.db.DATABASE_URL = test_url
+            app.db.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+            
+            # Crear tablas si no existen
+            from app.db import Base
+            from app import models
+            Base.metadata.create_all(bind=test_engine)
+            
+            return {
+                "success": True,
+                "message": f"✅ PostgreSQL reconectado exitosamente usando {working_var}",
+                "database": db_name,
+                "postgres_version": version.split()[1] if version else "Unknown",
+                "working_url_var": working_var,
+                "working_url": test_url.replace(test_url.split('@')[0].split(':')[-1], '***'),
+                "all_results": results,
+                "tables_created": "✅ Tablas verificadas/creadas"
+            }
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "password authentication failed" in error_msg:
+                results.append(f"{var_name}: ❌ Credenciales incorrectas")
+            elif "connection" in error_msg.lower():
+                results.append(f"{var_name}: ❌ Error de conexión")
+            else:
+                results.append(f"{var_name}: ❌ {error_msg[:50]}...")
+    
+    return {
+        "success": False,
+        "message": "❌ No se pudo conectar con ninguna URL de PostgreSQL",
+        "all_results": results,
+        "current_fallback": "SQLite en /tmp/ses_gastos.db",
+        "suggestion": "Verificar credenciales de PostgreSQL en Render dashboard o usar SQLite temporalmente"
+    }
+
+@app.post("/migrate-sqlite-to-postgres")
+def migrate_sqlite_to_postgres():
+    """Migrar datos de SQLite a PostgreSQL una vez reconectado"""
+    try:
+        from app.db import engine, DATABASE_URL
+        from sqlalchemy import text
+        
+        # Verificar que estamos usando PostgreSQL
+        if "postgresql" not in DATABASE_URL:
+            return {
+                "success": False,
+                "message": "❌ No estás conectado a PostgreSQL",
+                "current_db": DATABASE_URL,
+                "suggestion": "Ejecuta /fix-postgres-now primero"
+            }
+        
+        # Contar registros actuales en PostgreSQL
+        with engine.connect() as conn:
+            apartments_count = conn.execute(text("SELECT COUNT(*) FROM apartments")).scalar()
+            expenses_count = conn.execute(text("SELECT COUNT(*) FROM expenses")).scalar()
+            incomes_count = conn.execute(text("SELECT COUNT(*) FROM incomes")).scalar()
+            
+        return {
+            "success": True,
+            "message": "✅ Ya estás usando PostgreSQL",
+            "database": "PostgreSQL",
+            "current_data": {
+                "apartments": apartments_count,
+                "expenses": expenses_count, 
+                "incomes": incomes_count
+            },
+            "note": "Los datos ya están en PostgreSQL"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "❌ Error verificando migración"
+        }
+
 @app.get("/")
 def root():
     return {
