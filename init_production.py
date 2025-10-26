@@ -103,6 +103,13 @@ def create_initial_data():
         try:
             # Verificar apartamentos
             apartments_count = db.query(models.Apartment).count()
+            expenses_count = db.query(models.Expense).count()
+            incomes_count = db.query(models.Income).count()
+            
+            print(f"   📊 Estado actual de la base de datos:")
+            print(f"      - Apartamentos: {apartments_count}")
+            print(f"      - Gastos: {expenses_count}")
+            print(f"      - Ingresos: {incomes_count}")
             
             if apartments_count == 0:
                 print("   📝 Creando apartamentos por defecto...")
@@ -116,28 +123,35 @@ def create_initial_data():
                 
                 created_apartments = []
                 for apt_data in default_apartments:
-                    apt = models.Apartment(
-                        code=apt_data["code"],
-                        name=apt_data["name"],
-                        owner_email=apt_data["owner_email"],
-                        is_active=True
-                    )
-                    db.add(apt)
-                    created_apartments.append(apt)
+                    # Verificar si ya existe un apartamento con este código
+                    existing = db.query(models.Apartment).filter(models.Apartment.code == apt_data["code"]).first()
+                    if not existing:
+                        apt = models.Apartment(
+                            code=apt_data["code"],
+                            name=apt_data["name"],
+                            owner_email=apt_data["owner_email"],
+                            is_active=True
+                        )
+                        db.add(apt)
+                        created_apartments.append(apt)
                 
-                db.commit()
-                
-                # Refresh para obtener IDs
-                for apt in created_apartments:
-                    db.refresh(apt)
-                
-                print(f"   ✅ Creados {len(created_apartments)} apartamentos")
-                
-                # Crear datos de demostración solo en desarrollo
-                if os.getenv('RENDER_SERVICE_NAME'):  # En producción de Render
-                    print("   ℹ️ Producción: No creando datos de demo")
+                if created_apartments:
+                    db.commit()
+                    
+                    # Refresh para obtener IDs
+                    for apt in created_apartments:
+                        db.refresh(apt)
+                    
+                    print(f"   ✅ Creados {len(created_apartments)} apartamentos nuevos")
                 else:
-                    print("   📊 Creando datos de demostración...")
+                    print("   ℹ️ Todos los apartamentos ya existían")
+                
+                # Solo crear datos de demo si estamos en desarrollo local
+                # En producción de Render, no crear datos de demo automáticamente
+                is_render_production = os.getenv('RENDER_SERVICE_NAME') or os.getenv('RENDER')
+                
+                if not is_render_production and created_apartments:
+                    print("   📊 Creando datos de demostración (desarrollo)...")
                     
                     # Gasto de demo
                     expense = models.Expense(
@@ -167,8 +181,18 @@ def create_initial_data():
                     
                     db.commit()
                     print("   ✅ Datos de demostración creados")
+                elif is_render_production:
+                    print("   ℹ️ Producción: Datos de demo no creados automáticamente")
+                    print("   💡 Usa el dashboard para añadir datos reales")
             else:
-                print(f"   ℹ️ Ya existen {apartments_count} apartamentos")
+                print(f"   ✅ Base de datos ya tiene datos - conservando existentes")
+                
+                # Mostrar algunos apartamentos existentes
+                apartments = db.query(models.Apartment).limit(5).all()
+                if apartments:
+                    print("   🏠 Apartamentos encontrados:")
+                    for apt in apartments:
+                        print(f"      - {apt.code}: {apt.name}")
             
             return True
             
@@ -177,6 +201,8 @@ def create_initial_data():
             
     except Exception as e:
         print(f"   ❌ Error creando datos iniciales: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def verify_production_setup():
