@@ -33,154 +33,143 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Crear/migrar tablas al arrancar
 @app.on_event("startup")
 def on_startup() -> None:
-    # Intentar reconectar a PostgreSQL si es posible
-    global engine
+    """Inicialización de la aplicación al arrancar"""
+    print("[startup] 🚀 Iniciando SES.GASTOS...")
+    
+    # Verificar conexión de base de datos
     try:
-        database_url = os.getenv("DATABASE_URL")
-        if database_url and "postgresql" in database_url:
-            print("[startup] 🔄 Intentando reconectar a PostgreSQL...")
-            from sqlalchemy import create_engine, text
+        from .db import test_connection, create_tables
+        if test_connection():
+            print("[startup] ✅ Base de datos conectada")
             
-            pg_engine = create_engine(
-                database_url, 
-                pool_pre_ping=True,
-                connect_args={"connect_timeout": 30, "application_name": "ses-gastos"}
-            )
-            
-            # Test de conexión
-            with pg_engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            
-            # Si llegamos aquí, PostgreSQL funciona
-            engine = pg_engine
-            print("[startup] ✅ PostgreSQL reconectado exitosamente")
+            # Crear tablas si no existen
+            if create_tables():
+                print("[startup] ✅ Tablas verificadas/creadas")
+            else:
+                print("[startup] ⚠️ Problema creando tablas")
         else:
-            print("[startup] 📁 Continuando con SQLite")
+            print("[startup] ❌ Error de conexión a base de datos")
+            return
             
-    except Exception as pg_error:
-        print(f"[startup] ❌ PostgreSQL falló en startup: {pg_error}")
-        print("[startup] 📁 Continuando con SQLite")
+    except Exception as db_error:
+        print(f"[startup] ❌ Error de base de datos: {db_error}")
+        return
     
-    try:
-        Base.metadata.create_all(bind=engine)
-        print("[startup] ✅ Tablas creadas/verificadas")
-    except Exception as e:
-        print(f"[startup] ❌ Error creando tablas: {e}")
-    
-    # Inicializar apartamentos básicos si no existen
+    # Inicializar datos básicos si no existen
     try:
         from .db import SessionLocal
         from . import models
+        from datetime import date, timedelta
         
         db = SessionLocal()
-        existing_apartments = db.query(models.Apartment).count()
-        
-        if existing_apartments == 0:
-            print("[startup] No apartments found, creating default apartments...")
+        try:
+            existing_apartments = db.query(models.Apartment).count()
             
-            default_apartments = [
-                {"code": "SES01", "name": "Apartamento Centro", "owner_email": "admin@sesgas.com"},
-                {"code": "SES02", "name": "Apartamento Playa", "owner_email": "admin@sesgas.com"},
-                {"code": "SES03", "name": "Apartamento Montaña", "owner_email": "admin@sesgas.com"}
-            ]
-            
-            for apt_data in default_apartments:
-                apt = models.Apartment(
-                    code=apt_data["code"],
-                    name=apt_data["name"],
-                    owner_email=apt_data["owner_email"],
-                    is_active=True
-                )
-                db.add(apt)
-            
-            db.commit()
-            print(f"[startup] Created {len(default_apartments)} default apartments")
-            
-            # Crear datos de demostración automáticamente
-            try:
-                from datetime import date, timedelta
+            if existing_apartments == 0:
+                print("[startup] 📝 Creando apartamentos por defecto...")
                 
-                # Crear gastos de demo
-                expenses_demo = [
-                    {"amount": 45.50, "category": "Restauración", "vendor": "Restaurante Demo", "description": "Cena de negocios"},
-                    {"amount": 25.00, "category": "Transporte", "vendor": "Taxi Express", "description": "Traslado aeropuerto"},
-                    {"amount": 80.75, "category": "Limpieza", "vendor": "Clean Pro", "description": "Limpieza profunda"},
-                    {"amount": 35.00, "category": "Suministros", "vendor": "Ferretería Local", "description": "Material de reparación"}
+                # Crear apartamentos por defecto
+                default_apartments_data = [
+                    {"code": "SES01", "name": "Apartamento Centro", "owner_email": "admin@sesgas.com"},
+                    {"code": "SES02", "name": "Apartamento Playa", "owner_email": "admin@sesgas.com"},
+                    {"code": "SES03", "name": "Apartamento Montaña", "owner_email": "admin@sesgas.com"}
                 ]
                 
-                for i, exp_data in enumerate(expenses_demo):
-                    expense = models.Expense(
-                        apartment_id=created_apartments[0].id,  # SES01
-                        date=date.today(),
-                        amount_gross=exp_data["amount"],
-                        currency="EUR",
-                        category=exp_data["category"],
-                        description=exp_data["description"],
-                        vendor=exp_data["vendor"],
-                        source="demo_startup"
+                created_apartments = []
+                for apt_data in default_apartments_data:
+                    apt = models.Apartment(
+                        code=apt_data["code"],
+                        name=apt_data["name"],
+                        owner_email=apt_data["owner_email"],
+                        is_active=True
                     )
-                    db.add(expense)
-                
-                # Crear reservas de demo
-                reservation = models.Reservation(
-                    apartment_id=created_apartments[0].id,
-                    check_in=date.today() + timedelta(days=2),
-                    check_out=date.today() + timedelta(days=6),
-                    guests=2,
-                    channel="Booking.com",
-                    email_contact="demo@example.com",
-                    phone_contact="+34123456789",
-                    status="CONFIRMED"
-                )
-                db.add(reservation)
-                db.flush()  # Para obtener ID
-                
-                # Crear ingresos de demo
-                incomes_demo = [
-                    {"amount": 200.00, "status": "CONFIRMED", "source": "booking_com", "guest": "Juan Pérez"},
-                    {"amount": 150.00, "status": "CONFIRMED", "source": "airbnb", "guest": "María García"},
-                    {"amount": 180.00, "status": "PENDING", "source": "direct", "guest": "Carlos López"}
-                ]
-                
-                for inc_data in incomes_demo:
-                    income = models.Income(
-                        apartment_id=created_apartments[0].id,
-                        reservation_id=reservation.id if inc_data["status"] == "CONFIRMED" else None,
-                        date=date.today(),
-                        amount_gross=inc_data["amount"],
-                        currency="EUR",
-                        status=inc_data["status"],
-                        source=inc_data["source"],
-                        guest_name=inc_data["guest"],
-                        guest_email=f"{inc_data['guest'].lower().replace(' ', '.')}@example.com"
-                    )
-                    db.add(income)
+                    db.add(apt)
+                    created_apartments.append(apt)
                 
                 db.commit()
-                print(f"[startup] ✅ Datos de demostración creados: {len(expenses_demo)} gastos, 1 reserva, {len(incomes_demo)} ingresos")
                 
-            except Exception as demo_error:
-                print(f"[startup] ⚠️ Error creando datos demo: {demo_error}")
-                db.rollback()
-        else:
-            print(f"[startup] Found {existing_apartments} existing apartments")
+                # Refresh para obtener IDs
+                for apt in created_apartments:
+                    db.refresh(apt)
+                
+                print(f"[startup] ✅ Creados {len(created_apartments)} apartamentos")
+                
+                # Crear datos de demostración
+                try:
+                    # Gastos de demo
+                    expenses_demo = [
+                        {"amount": 45.50, "category": "Restauración", "vendor": "Restaurante Demo", "description": "Cena de negocios"},
+                        {"amount": 25.00, "category": "Transporte", "vendor": "Taxi Express", "description": "Traslado aeropuerto"},
+                        {"amount": 80.75, "category": "Limpieza", "vendor": "Clean Pro", "description": "Limpieza profunda"},
+                        {"amount": 35.00, "category": "Suministros", "vendor": "Ferretería Local", "description": "Material de reparación"}
+                    ]
+                    
+                    for exp_data in expenses_demo:
+                        expense = models.Expense(
+                            apartment_id=created_apartments[0].id,
+                            date=date.today(),
+                            amount_gross=exp_data["amount"],
+                            currency="EUR",
+                            category=exp_data["category"],
+                            description=exp_data["description"],
+                            vendor=exp_data["vendor"],
+                            source="demo_startup"
+                        )
+                        db.add(expense)
+                    
+                    # Reserva de demo
+                    reservation = models.Reservation(
+                        apartment_id=created_apartments[0].id,
+                        check_in=date.today() + timedelta(days=2),
+                        check_out=date.today() + timedelta(days=6),
+                        guests=2,
+                        channel="Booking.com",
+                        email_contact="demo@example.com",
+                        phone_contact="+34123456789",
+                        status="CONFIRMED"
+                    )
+                    db.add(reservation)
+                    db.flush()  # Para obtener ID
+                    
+                    # Ingresos de demo
+                    incomes_demo = [
+                        {"amount": 200.00, "status": "CONFIRMED", "source": "booking_com", "guest": "Juan Pérez"},
+                        {"amount": 150.00, "status": "CONFIRMED", "source": "airbnb", "guest": "María García"},
+                        {"amount": 180.00, "status": "PENDING", "source": "direct", "guest": "Carlos López"}
+                    ]
+                    
+                    for inc_data in incomes_demo:
+                        income = models.Income(
+                            apartment_id=created_apartments[0].id,
+                            reservation_id=reservation.id if inc_data["status"] == "CONFIRMED" else None,
+                            date=date.today(),
+                            amount_gross=inc_data["amount"],
+                            currency="EUR",
+                            status=inc_data["status"],
+                            source=inc_data["source"],
+                            guest_name=inc_data["guest"],
+                            guest_email=f"{inc_data['guest'].lower().replace(' ', '.')}@example.com"
+                        )
+                        db.add(income)
+                    
+                    db.commit()
+                    print(f"[startup] ✅ Datos demo: {len(expenses_demo)} gastos, 1 reserva, {len(incomes_demo)} ingresos")
+                    
+                except Exception as demo_error:
+                    print(f"[startup] ⚠️ Error creando datos demo: {demo_error}")
+                    db.rollback()
+            else:
+                print(f"[startup] ℹ️ Encontrados {existing_apartments} apartamentos existentes")
+                
+        finally:
+            db.close()
             
-        db.close()
-        
-    except Exception as e:
-        print(f"[startup] Error initializing apartments: {e}")
+    except Exception as init_error:
+        print(f"[startup] ❌ Error inicializando datos: {init_error}")
     
-    # Iniciar bot de Telegram (temporalmente deshabilitado por problemas de threading)
-    try:
-        # from .telegram_bot_service import telegram_service
-        # if telegram_service.should_start_bot():
-        #     telegram_service.start_bot_in_thread()
-        #     print("[startup] ✅ Telegram bot iniciado correctamente")
-        # else:
-        #     print("[startup] ⚠️ Telegram bot no iniciado - faltan variables de entorno")
-        print("[startup] ⚠️ Bot Telegram deshabilitado temporalmente (usar webhooks)")
-    except Exception as e:
-        print(f"[startup] ❌ Error iniciando Telegram bot: {e}")
+    # Configuración de bot (deshabilitado temporalmente)
+    print("[startup] ⚠️ Bot Telegram configurado para webhooks")
+    print("[startup] 🎉 SES.GASTOS iniciado correctamente")
 
 @app.on_event("shutdown")
 def on_shutdown() -> None:

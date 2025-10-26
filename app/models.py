@@ -111,8 +111,8 @@ class Expense(Base):
 class Income(Base):
     __tablename__ = "incomes"
 
-    # PK UUID (se queda como uuid en BD)
-    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # PK UUID consistente con otros modelos (String para compatibilidad)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 
     # Alineado con reservations.id (varchar(36))
     reservation_id = Column(String(36), ForeignKey("reservations.id"), nullable=True)

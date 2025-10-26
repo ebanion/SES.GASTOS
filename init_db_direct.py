@@ -6,15 +6,23 @@ import sys
 import os
 sys.path.append('.')
 
-from app.db import SessionLocal, engine
-from app import models
-from datetime import datetime, timedelta
-
 def init_database():
     print("🚀 Inicializando base de datos directamente...")
     
-    # Crear todas las tablas
-    models.Base.metadata.create_all(bind=engine)
+    # Importar después de configurar el path
+    from app.db import SessionLocal, engine, test_connection, create_tables
+    from app import models
+    from datetime import datetime, timedelta
+    
+    # Verificar conexión
+    if not test_connection():
+        print("❌ Error: No se puede conectar a la base de datos")
+        return False
+    
+    # Crear tablas
+    if not create_tables():
+        print("❌ Error: No se pudieron crear las tablas")
+        return False
     
     db = SessionLocal()
     try:
