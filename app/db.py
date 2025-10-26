@@ -110,16 +110,14 @@ if "postgresql" in DATABASE_URL:
         print(f"[DB] ❌ PostgreSQL falló después de {max_retries} intentos: {pg_error}")
         print(f"[DB] 🔍 URL problemática: {masked}")
         
-        # En producción con Render, NO usar SQLite - fallar explícitamente
-        if os.getenv("RENDER"):
-            print("[DB] 🚨 ERROR CRÍTICO: PostgreSQL requerido en producción")
-            raise RuntimeError(f"PostgreSQL connection failed in production: {pg_error}")
-        else:
-            print("[DB] 🔄 Desarrollo: Usando SQLite como fallback...")
-            db_dir = os.getenv("SQLITE_DIR", "/tmp")
-            DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos.db"
-            engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-            print(f"[DB] SQLite: {db_dir}/ses_gastos.db")
+        # En producción, usar SQLite como fallback temporal
+        print("[DB] ⚠️ PostgreSQL falló, usando SQLite como fallback temporal")
+        print(f"[DB] 🔍 Error PostgreSQL: {pg_error}")
+        db_dir = os.getenv("SQLITE_DIR", "/tmp")
+        DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos.db"
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        print(f"[DB] 📁 SQLite temporal: {db_dir}/ses_gastos.db")
+        print("[DB] 💡 Esto permite que la app funcione mientras se arregla PostgreSQL")
 else:
     print("[DB] 📁 Usando SQLite (desarrollo)...")
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)

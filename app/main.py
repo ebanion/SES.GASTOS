@@ -11,10 +11,19 @@ from .db import Base, engine
 
 # Importaciones básicas primero
 try:
-    from .routers import auth, apartments, incomes, reservations, expenses, admin, public, user_dashboard, email_setup, email_webhooks, vectors, admin_management
+    from .routers import auth, apartments, incomes, reservations, expenses, admin, public, user_dashboard, email_setup, email_webhooks, vectors
     print("[import] ✅ Routers básicos importados")
 except Exception as e:
     print(f"[import] ❌ Error en routers básicos: {e}")
+
+# Importar admin_management por separado para evitar errores
+try:
+    from .routers import admin_management
+    print("[import] ✅ Admin management importado")
+    ADMIN_MANAGEMENT_AVAILABLE = True
+except Exception as e:
+    print(f"[import] ⚠️ Admin management no disponible: {e}")
+    ADMIN_MANAGEMENT_AVAILABLE = False
 
 try:
     from .dashboard_api import router as dashboard_router
@@ -652,11 +661,14 @@ try:
 except Exception as e:
     print(f"[router] ❌ Error incluyendo vectors: {e}")
 
-try:
-    app.include_router(admin_management.router)
-    print("[router] ✅ Admin management router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo admin_management: {e}")
+if ADMIN_MANAGEMENT_AVAILABLE:
+    try:
+        app.include_router(admin_management.router)
+        print("[router] ✅ Admin management router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo admin_management: {e}")
+else:
+    print("[router] ⚠️ Admin management no disponible")
 
 # Agregar webhook de Telegram para producción
 try:
@@ -677,6 +689,72 @@ if dashboard_router:
 @app.get("/debug/routes")
 def list_routes():
     return sorted([getattr(r, "path", "") for r in app.router.routes])
+
+@app.post("/fix-postgres-connection")
+def fix_postgres_connection():
+    """Intentar reconectar a PostgreSQL con credenciales actualizadas"""
+    import os
+    from sqlalchemy import create_engine, text
+    
+    # Obtener todas las posibles URLs de PostgreSQL
+    database_urls = [
+        os.getenv("DATABASE_URL"),
+        os.getenv("DATABASE_PRIVATE_URL"), 
+        os.getenv("POSTGRES_URL"),
+        os.getenv("POSTGRESQL_URL")
+    ]
+    
+    results = []
+    
+    for i, url in enumerate(database_urls):
+        if not url:
+            results.append(f"URL {i+1}: No configurada")
+            continue
+            
+        if "postgresql" not in url:
+            results.append(f"URL {i+1}: No es PostgreSQL")
+            continue
+            
+        try:
+            # Normalizar URL
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql+psycopg://", 1)
+            elif not url.startswith("postgresql+psycopg://"):
+                url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+            
+            # Probar conexión
+            test_engine = create_engine(url, pool_pre_ping=True)
+            with test_engine.connect() as conn:
+                version = conn.execute(text("SELECT version()")).scalar()
+                db_name = conn.execute(text("SELECT current_database()")).scalar()
+                
+            results.append(f"URL {i+1}: ✅ FUNCIONA - DB: {db_name}")
+            
+            # Si funciona, actualizar engine global
+            global engine
+            from sqlalchemy.orm import sessionmaker
+            engine = test_engine
+            app.db.engine = test_engine
+            app.db.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+            
+            return {
+                "success": True,
+                "message": f"✅ PostgreSQL reconectado exitosamente",
+                "database": db_name,
+                "postgres_version": version.split()[1],
+                "url_used": f"URL {i+1}",
+                "all_results": results
+            }
+            
+        except Exception as e:
+            results.append(f"URL {i+1}: ❌ Error - {str(e)[:100]}")
+    
+    return {
+        "success": False,
+        "message": "❌ No se pudo conectar con ninguna URL de PostgreSQL",
+        "all_results": results,
+        "suggestion": "Verificar credenciales de PostgreSQL en Render dashboard"
+    }
 
 @app.post("/test/create-expense")
 def test_create_expense():
