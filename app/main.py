@@ -84,6 +84,7 @@ def on_startup() -> None:
                 {"code": "SES03", "name": "Apartamento Montaña", "owner_email": "admin@sesgas.com"}
             ]
             
+            created_apartments = []
             for apt_data in default_apartments:
                 apt = models.Apartment(
                     code=apt_data["code"],
@@ -92,8 +93,14 @@ def on_startup() -> None:
                     is_active=True
                 )
                 db.add(apt)
+                created_apartments.append(apt)
             
             db.commit()
+            
+            # Refresh para obtener IDs
+            for apt in created_apartments:
+                db.refresh(apt)
+                
             print(f"[startup] Created {len(default_apartments)} default apartments")
             
             # Crear datos de demostración automáticamente
@@ -110,7 +117,7 @@ def on_startup() -> None:
                 
                 for i, exp_data in enumerate(expenses_demo):
                     expense = models.Expense(
-                        apartment_id=created_apartments[0].id,  # SES01
+                        apartment_id=created_apartments[0].id,  # Use first created apartment
                         date=date.today(),
                         amount_gross=exp_data["amount"],
                         currency="EUR",
