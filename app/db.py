@@ -70,7 +70,7 @@ connect_args = {}
 
 # Forzar uso de PostgreSQL si está disponible
 if "postgresql" in DATABASE_URL:
-    print("[DB] 🐘 Forzando PostgreSQL...")
+    print("[DB] 🐘 Configurando PostgreSQL...")
     try:
         # Configuración optimizada para Render PostgreSQL
         connect_args = {
@@ -87,21 +87,41 @@ if "postgresql" in DATABASE_URL:
             echo=False
         )
         
-        # Test de conexión inmediato
+        # Test de conexión inmediato con reintentos
         from sqlalchemy import text
-        with engine.connect() as conn:
-            version = conn.execute(text("SELECT version()")).scalar()
-            print(f"[DB] ✅ PostgreSQL FUNCIONANDO: {version.split()[1]}")
+        import time
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with engine.connect() as conn:
+                    version = conn.execute(text("SELECT version()")).scalar()
+                    print(f"[DB] ✅ PostgreSQL CONECTADO: {version.split()[1]}")
+                    print(f"[DB] 🎯 Base de datos: dbname_zoe8")
+                    break
+            except Exception as retry_error:
+                print(f"[DB] ⚠️ Intento {attempt + 1}/{max_retries} falló: {retry_error}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)  # Esperar antes del siguiente intento
+                else:
+                    raise retry_error
             
     except Exception as pg_error:
-        print(f"[DB] ❌ PostgreSQL falló: {pg_error}")
-        print("[DB] 🔄 Usando SQLite como fallback...")
-        db_dir = os.getenv("SQLITE_DIR", "/tmp")
-        DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos.db"
-        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-        print(f"[DB] SQLite: {db_dir}/ses_gastos.db")
+        print(f"[DB] ❌ PostgreSQL falló después de {max_retries} intentos: {pg_error}")
+        print(f"[DB] 🔍 URL problemática: {masked}")
+        
+        # En producción con Render, NO usar SQLite - fallar explícitamente
+        if os.getenv("RENDER"):
+            print("[DB] 🚨 ERROR CRÍTICO: PostgreSQL requerido en producción")
+            raise RuntimeError(f"PostgreSQL connection failed in production: {pg_error}")
+        else:
+            print("[DB] 🔄 Desarrollo: Usando SQLite como fallback...")
+            db_dir = os.getenv("SQLITE_DIR", "/tmp")
+            DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos.db"
+            engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+            print(f"[DB] SQLite: {db_dir}/ses_gastos.db")
 else:
-    print("[DB] 📁 Usando SQLite...")
+    print("[DB] 📁 Usando SQLite (desarrollo)...")
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
