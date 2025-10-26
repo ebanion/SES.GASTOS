@@ -9,12 +9,84 @@ from . import models  # noqa
 
 from .db import Base, engine
 
-# Importaciones básicas primero
+# Importaciones básicas primero - importar individualmente para evitar fallos en cadena
+auth = None
+apartments = None
+incomes = None
+reservations = None
+expenses = None
+admin = None
+public = None
+user_dashboard = None
+email_setup = None
+email_webhooks = None
+vectors = None
+
 try:
-    from .routers import auth, apartments, incomes, reservations, expenses, admin, public, user_dashboard, email_setup, email_webhooks, vectors
-    print("[import] ✅ Routers básicos importados")
+    from .routers import auth
+    print("[import] ✅ Auth router importado")
 except Exception as e:
-    print(f"[import] ❌ Error en routers básicos: {e}")
+    print(f"[import] ❌ Error en auth router: {e}")
+
+try:
+    from .routers import apartments
+    print("[import] ✅ Apartments router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en apartments router: {e}")
+
+try:
+    from .routers import incomes
+    print("[import] ✅ Incomes router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en incomes router: {e}")
+
+try:
+    from .routers import reservations
+    print("[import] ✅ Reservations router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en reservations router: {e}")
+
+try:
+    from .routers import expenses
+    print("[import] ✅ Expenses router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en expenses router: {e}")
+
+try:
+    from .routers import admin
+    print("[import] ✅ Admin router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en admin router: {e}")
+
+try:
+    from .routers import public
+    print("[import] ✅ Public router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en public router: {e}")
+
+try:
+    from .routers import user_dashboard
+    print("[import] ✅ User dashboard router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en user_dashboard router: {e}")
+
+try:
+    from .routers import email_setup
+    print("[import] ✅ Email setup router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en email_setup router: {e}")
+
+try:
+    from .routers import email_webhooks
+    print("[import] ✅ Email webhooks router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en email_webhooks router: {e}")
+
+try:
+    from .routers import vectors
+    print("[import] ✅ Vectors router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en vectors router: {e}")
 
 # Importar admin_management por separado para evitar errores
 try:
