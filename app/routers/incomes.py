@@ -133,7 +133,14 @@ def cancel_income(
     income_id: str,
     db: Session = Depends(get_db),
 ):
-    inc = db.query(models.Income).filter(models.Income.id == income_id).first()
+    try:
+        # Convertir string a UUID para la consulta
+        import uuid
+        uuid_id = uuid.UUID(income_id)
+        inc = db.query(models.Income).filter(models.Income.id == uuid_id).first()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_uuid_format")
+    
     if not inc:
         raise HTTPException(status_code=404, detail="income_not_found")
 
@@ -379,7 +386,14 @@ def create_income(payload: schemas.IncomeCreate, db: Session = Depends(get_db)):
 @router.get("/{income_id}", response_model=schemas.IncomeOut)
 def get_income(income_id: str, db: Session = Depends(get_db)):
     """Obtener ingreso por ID"""
-    income = db.query(models.Income).filter(models.Income.id == income_id).first()
+    try:
+        # Convertir string a UUID para la consulta
+        import uuid
+        uuid_id = uuid.UUID(income_id)
+        income = db.query(models.Income).filter(models.Income.id == uuid_id).first()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_uuid_format")
+    
     if not income:
         raise HTTPException(status_code=404, detail="income_not_found")
     
@@ -388,7 +402,14 @@ def get_income(income_id: str, db: Session = Depends(get_db)):
 @router.put("/{income_id}", response_model=schemas.IncomeOut, dependencies=[Depends(require_internal_key)])
 def update_income(income_id: str, payload: schemas.IncomeCreate, db: Session = Depends(get_db)):
     """Actualizar ingreso completo"""
-    income = db.query(models.Income).filter(models.Income.id == income_id).first()
+    try:
+        # Convertir string a UUID para la consulta
+        import uuid
+        uuid_id = uuid.UUID(income_id)
+        income = db.query(models.Income).filter(models.Income.id == uuid_id).first()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_uuid_format")
+    
     if not income:
         raise HTTPException(status_code=404, detail="income_not_found")
     
@@ -431,7 +452,14 @@ def update_income(income_id: str, payload: schemas.IncomeCreate, db: Session = D
 @router.patch("/{income_id}", response_model=schemas.IncomeOut, dependencies=[Depends(require_internal_key)])
 def patch_income(income_id: str, updates: dict, db: Session = Depends(get_db)):
     """Actualizar ingreso parcialmente"""
-    income = db.query(models.Income).filter(models.Income.id == income_id).first()
+    try:
+        # Convertir string a UUID para la consulta
+        import uuid
+        uuid_id = uuid.UUID(income_id)
+        income = db.query(models.Income).filter(models.Income.id == uuid_id).first()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_uuid_format")
+    
     if not income:
         raise HTTPException(status_code=404, detail="income_not_found")
     
@@ -468,7 +496,14 @@ def patch_income(income_id: str, updates: dict, db: Session = Depends(get_db)):
 @router.delete("/{income_id}", dependencies=[Depends(require_internal_key)])
 def delete_income(income_id: str, db: Session = Depends(get_db)):
     """Eliminar ingreso"""
-    income = db.query(models.Income).filter(models.Income.id == income_id).first()
+    try:
+        # Convertir string a UUID para la consulta
+        import uuid
+        uuid_id = uuid.UUID(income_id)
+        income = db.query(models.Income).filter(models.Income.id == uuid_id).first()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_uuid_format")
+    
     if not income:
         raise HTTPException(status_code=404, detail="income_not_found")
     

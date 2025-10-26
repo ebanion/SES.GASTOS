@@ -21,6 +21,7 @@ user_dashboard = None
 email_setup = None
 email_webhooks = None
 vectors = None
+management = None
 
 try:
     from .routers import auth
@@ -87,6 +88,12 @@ try:
     print("[import] ✅ Vectors router importado")
 except Exception as e:
     print(f"[import] ❌ Error en vectors router: {e}")
+
+try:
+    from .routers import management
+    print("[import] ✅ Management router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en management router: {e}")
 
 # Importar admin_management por separado para evitar errores
 try:
@@ -801,72 +808,90 @@ def root():
 def dashboard_redirect():
     return RedirectResponse(url="/api/v1/dashboard/")
 
-# Incluir routers básicos solamente
-try:
-    app.include_router(auth.router)
-    print("[router] ✅ Auth router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo auth: {e}")
+# Incluir routers básicos solamente - verificar que estén importados
+if auth:
+    try:
+        app.include_router(auth.router)
+        print("[router] ✅ Auth router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo auth: {e}")
 
-try:
-    app.include_router(apartments.router)
-    print("[router] ✅ Apartments router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo apartments: {e}")
+if apartments:
+    try:
+        app.include_router(apartments.router)
+        print("[router] ✅ Apartments router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo apartments: {e}")
 
-try:
-    app.include_router(incomes.router)
-    print("[router] ✅ Incomes router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo incomes: {e}")
+if incomes:
+    try:
+        app.include_router(incomes.router)
+        print("[router] ✅ Incomes router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo incomes: {e}")
 
-try:
-    app.include_router(reservations.router)
-    print("[router] ✅ Reservations router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo reservations: {e}")
+if reservations:
+    try:
+        app.include_router(reservations.router)
+        print("[router] ✅ Reservations router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo reservations: {e}")
 
-try:
-    app.include_router(expenses.router)
-    print("[router] ✅ Expenses router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo expenses: {e}")
+if expenses:
+    try:
+        app.include_router(expenses.router)
+        print("[router] ✅ Expenses router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo expenses: {e}")
 
-try:
-    app.include_router(admin.router)
-    print("[router] ✅ Admin router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo admin: {e}")
+if admin:
+    try:
+        app.include_router(admin.router)
+        print("[router] ✅ Admin router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo admin: {e}")
 
-try:
-    app.include_router(public.router)
-    print("[router] ✅ Public router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo public: {e}")
+if public:
+    try:
+        app.include_router(public.router)
+        print("[router] ✅ Public router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo public: {e}")
 
-try:
-    app.include_router(user_dashboard.router)
-    print("[router] ✅ User dashboard router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo user_dashboard: {e}")
+if user_dashboard:
+    try:
+        app.include_router(user_dashboard.router)
+        print("[router] ✅ User dashboard router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo user_dashboard: {e}")
 
-try:
-    app.include_router(email_setup.router)
-    print("[router] ✅ Email setup router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo email_setup: {e}")
+if email_setup:
+    try:
+        app.include_router(email_setup.router)
+        print("[router] ✅ Email setup router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo email_setup: {e}")
 
-try:
-    app.include_router(email_webhooks.router)
-    print("[router] ✅ Email webhooks router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo email_webhooks: {e}")
+if email_webhooks:
+    try:
+        app.include_router(email_webhooks.router)
+        print("[router] ✅ Email webhooks router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo email_webhooks: {e}")
 
-try:
-    app.include_router(vectors.router)
-    print("[router] ✅ Vectors router incluido")
-except Exception as e:
-    print(f"[router] ❌ Error incluyendo vectors: {e}")
+if vectors:
+    try:
+        app.include_router(vectors.router)
+        print("[router] ✅ Vectors router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo vectors: {e}")
+
+if management:
+    try:
+        app.include_router(management.router)
+        print("[router] ✅ Management router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo management: {e}")
 
 if ADMIN_MANAGEMENT_AVAILABLE:
     try:
