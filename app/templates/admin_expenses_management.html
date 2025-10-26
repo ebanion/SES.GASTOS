@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Gastos - SES.GASTOS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+        .actions-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .btn {
+            padding: 12px 20px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+        .btn:hover { background: #2980b9; }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #229954; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-warning { background: #f39c12; }
+        .btn-warning:hover { background: #e67e22; }
+        .expenses-grid {
+            display: grid;
+            gap: 15px;
+        }
+        .expense-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        .expense-card:hover { transform: translateY(-2px); }
+        .expense-header {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .expense-amount {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .expense-date {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+        .expense-body {
+            padding: 20px;
+        }
+        .expense-info {
+            margin-bottom: 10px;
+        }
+        .expense-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 0.9em;
+        }
+        .filter-section {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .filter-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-controls select {
+            padding: 8px 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            background: white;
+        }
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            background: #f39c12;
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ecf0f1;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .modal-footer {
+            padding: 20px;
+            text-align: right;
+            border-top: 1px solid #ecf0f1;
+        }
+        .close {
+            color: white;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .close:hover { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>💰 Gestión de Gastos</h1>
+            <a href="/admin/manage/" class="btn-back">← Volver al Panel</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div id="alert" class="alert"></div>
+        
+        <div class="filter-section">
+            <h3>🔍 Filtros</h3>
+            <div class="filter-controls">
+                <label>Apartamento:</label>
+                <select id="apartment-filter" onchange="filterExpenses()">
+                    <option value="">Todos los apartamentos</option>
+                    {% for apartment in apartments %}
+                    <option value="{{ apartment.id }}" {% if apartment.id == apartment_id %}selected{% endif %}>
+                        {{ apartment.code }} - {{ apartment.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <button onclick="loadExpenses()" class="btn btn-warning">🔄 Actualizar</button>
+            </div>
+        </div>
+        
+        <div class="actions-bar">
+            <div>
+                <h3>Total: <span id="expenses-count">{{ expenses|length }}</span> gastos</h3>
+                {% if selected_apartment %}
+                <p>Filtrado por: <strong>{{ selected_apartment.code }}</strong></p>
+                {% endif %}
+            </div>
+            <button class="btn btn-success" onclick="openCreateModal()">
+                ➕ Nuevo Gasto
+            </button>
+        </div>
+        
+        <div class="expenses-grid" id="expenses-grid">
+            {% for expense in expenses %}
+            <div class="expense-card" data-expense-id="{{ expense.id }}">
+                <div class="expense-header">
+                    <div>
+                        <div class="expense-amount">€{{ "%.2f"|format(expense.amount_gross) }}</div>
+                        <div>{{ expense.category or 'Sin categoría' }}</div>
+                    </div>
+                    <div class="expense-date">{{ expense.date.strftime('%d/%m/%Y') }}</div>
+                </div>
+                <div class="expense-body">
+                    <div class="expense-info">
+                        <strong>Proveedor:</strong> {{ expense.vendor or 'No especificado' }}
+                    </div>
+                    <div class="expense-info">
+                        <strong>Descripción:</strong> {{ expense.description or 'Sin descripción' }}
+                    </div>
+                    <div class="expense-info">
+                        <strong>Apartamento:</strong> {{ expense.apartment.code if expense.apartment else 'N/A' }}
+                    </div>
+                    {% if expense.invoice_number %}
+                    <div class="expense-info">
+                        <strong>Factura:</strong> {{ expense.invoice_number }}
+                    </div>
+                    {% endif %}
+                    <div class="expense-actions">
+                        <button class="btn btn-sm btn-danger" onclick="deleteExpense('{{ expense.id }}', '{{ expense.vendor or 'Sin proveedor' }}', {{ expense.amount_gross }})">
+                            🗑️ Eliminar
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            
+            {% if not expenses %}
+            <div style="text-align: center; padding: 40px; color: #7f8c8d;">
+                <h3>📭 No hay gastos</h3>
+                <p>No se encontraron gastos{% if selected_apartment %} para {{ selected_apartment.code }}{% endif %}.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Modal Crear Gasto -->
+    <div id="expenseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h3>Nuevo Gasto</h3>
+            </div>
+            <div class="modal-body">
+                <form id="expenseForm">
+                    <div class="form-group">
+                        <label for="apartment_id">Apartamento *</label>
+                        <select id="apartment_id" name="apartment_id" required>
+                            <option value="">Seleccionar apartamento</option>
+                            {% for apartment in apartments %}
+                            <option value="{{ apartment.id }}">{{ apartment.code }} - {{ apartment.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="date">Fecha *</label>
+                        <input type="date" id="date" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount_gross">Importe (€) *</label>
+                        <input type="number" id="amount_gross" name="amount_gross" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="category">Categoría *</label>
+                        <select id="category" name="category" required>
+                            <option value="">Seleccionar categoría</option>
+                            <option value="electricidad">Electricidad</option>
+                            <option value="agua">Agua</option>
+                            <option value="gas">Gas</option>
+                            <option value="telecomunicaciones">Telecomunicaciones</option>
+                            <option value="limpieza">Limpieza</option>
+                            <option value="mantenimiento">Mantenimiento</option>
+                            <option value="suministros">Suministros</option>
+                            <option value="otros">Otros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="vendor">Proveedor</label>
+                        <input type="text" id="vendor" name="vendor" placeholder="Nombre del proveedor">
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Descripción</label>
+                        <input type="text" id="description" name="description" placeholder="Descripción del gasto">
+                    </div>
+                    <div class="form-group">
+                        <label for="invoice_number">Número de Factura</label>
+                        <input type="text" id="invoice_number" name="invoice_number" placeholder="Número de factura">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="saveExpense()">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Establecer fecha actual por defecto
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        
+        function getAdminKey() {
+            let key = localStorage.getItem('admin_key');
+            if (!key) {
+                key = prompt('Introduce la clave de administrador:');
+                if (key) {
+                    localStorage.setItem('admin_key', key);
+                }
+            }
+            return key || '';
+        }
+        
+        function showAlert(message, type = 'success') {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+        
+        function filterExpenses() {
+            const apartmentId = document.getElementById('apartment-filter').value;
+            const url = apartmentId ? 
+                `/admin/manage/expenses?apartment_id=${apartmentId}` : 
+                '/admin/manage/expenses';
+            window.location.href = url;
+        }
+        
+        function loadExpenses() {
+            window.location.reload();
+        }
+        
+        function openCreateModal() {
+            document.getElementById('expenseForm').reset();
+            document.getElementById('date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('expenseModal').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('expenseModal').style.display = 'none';
+        }
+        
+        async function saveExpense() {
+            const form = document.getElementById('expenseForm');
+            const formData = new FormData(form);
+            
+            const adminKey = getAdminKey();
+            if (!adminKey) {
+                showAlert('Clave de administrador requerida', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/manage/api/expenses?key=${encodeURIComponent(adminKey)}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(data.message, 'success');
+                    closeModal();
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(data.detail || 'Error creando gasto', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error de conexión', 'danger');
+            }
+        }
+        
+        async function deleteExpense(expenseId, vendor, amount) {
+            if (!confirm(`¿Estás seguro de que quieres eliminar este gasto?\n\nProveedor: ${vendor}\nImporte: €${amount}`)) {
+                return;
+            }
+            
+            const adminKey = getAdminKey();
+            if (!adminKey) {
+                showAlert('Clave de administrador requerida', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/manage/api/expenses/${expenseId}?key=${encodeURIComponent(adminKey)}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(data.message, 'success');
+                    // Remover la tarjeta del DOM
+                    const card = document.querySelector(`[data-expense-id="${expenseId}"]`);
+                    if (card) {
+                        card.remove();
+                        // Actualizar contador
+                        const count = document.getElementById('expenses-count');
+                        count.textContent = parseInt(count.textContent) - 1;
+                    }
+                } else {
+                    showAlert(data.detail || 'Error eliminando gasto', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error de conexión', 'danger');
+            }
+        }
+        
+        // Cerrar modal al hacer clic fuera
+        window.onclick = function(event) {
+            const modal = document.getElementById('expenseModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>

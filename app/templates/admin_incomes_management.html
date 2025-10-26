@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Ingresos - SES.GASTOS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #27ae60, #229954);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+        .actions-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .btn {
+            padding: 12px 20px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+        .btn:hover { background: #2980b9; }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #229954; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-warning { background: #f39c12; }
+        .btn-warning:hover { background: #e67e22; }
+        .incomes-grid {
+            display: grid;
+            gap: 15px;
+        }
+        .income-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        .income-card:hover { transform: translateY(-2px); }
+        .income-header {
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .income-header.confirmed { background: linear-gradient(135deg, #27ae60, #229954); }
+        .income-header.pending { background: linear-gradient(135deg, #f39c12, #e67e22); }
+        .income-header.cancelled { background: linear-gradient(135deg, #95a5a6, #7f8c8d); }
+        .income-amount {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .income-status {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+        .income-body {
+            padding: 20px;
+        }
+        .income-info {
+            margin-bottom: 10px;
+        }
+        .income-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 0.9em;
+        }
+        .filter-section {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .filter-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-controls select {
+            padding: 8px 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            background: white;
+        }
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            background: #27ae60;
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ecf0f1;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .modal-footer {
+            padding: 20px;
+            text-align: right;
+            border-top: 1px solid #ecf0f1;
+        }
+        .close {
+            color: white;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .close:hover { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>📈 Gestión de Ingresos</h1>
+            <a href="/admin/manage/" class="btn-back">← Volver al Panel</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div id="alert" class="alert"></div>
+        
+        <div class="filter-section">
+            <h3>🔍 Filtros</h3>
+            <div class="filter-controls">
+                <label>Apartamento:</label>
+                <select id="apartment-filter" onchange="filterIncomes()">
+                    <option value="">Todos los apartamentos</option>
+                    {% for apartment in apartments %}
+                    <option value="{{ apartment.id }}" {% if apartment.id == apartment_id %}selected{% endif %}>
+                        {{ apartment.code }} - {{ apartment.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <label>Estado:</label>
+                <select id="status-filter" onchange="filterIncomes()">
+                    <option value="">Todos los estados</option>
+                    <option value="CONFIRMED" {% if status == 'CONFIRMED' %}selected{% endif %}>Confirmado</option>
+                    <option value="PENDING" {% if status == 'PENDING' %}selected{% endif %}>Pendiente</option>
+                    <option value="CANCELLED" {% if status == 'CANCELLED' %}selected{% endif %}>Cancelado</option>
+                </select>
+                <button onclick="loadIncomes()" class="btn btn-warning">🔄 Actualizar</button>
+            </div>
+        </div>
+        
+        <div class="actions-bar">
+            <div>
+                <h3>Total: <span id="incomes-count">{{ incomes|length }}</span> ingresos</h3>
+                {% if selected_apartment %}
+                <p>Filtrado por: <strong>{{ selected_apartment.code }}</strong></p>
+                {% endif %}
+                {% if status %}
+                <p>Estado: <strong>{{ status }}</strong></p>
+                {% endif %}
+            </div>
+            <button class="btn btn-success" onclick="openCreateModal()">
+                ➕ Nuevo Ingreso
+            </button>
+        </div>
+        
+        <div class="incomes-grid" id="incomes-grid">
+            {% for income in incomes %}
+            <div class="income-card" data-income-id="{{ income.id }}">
+                <div class="income-header {{ income.status.lower() }}">
+                    <div>
+                        <div class="income-amount">€{{ "%.2f"|format(income.amount_gross) }}</div>
+                        <div>{{ income.guest_name or 'Sin huésped' }}</div>
+                    </div>
+                    <div class="income-status">
+                        {% if income.status == 'CONFIRMED' %}✅ Confirmado
+                        {% elif income.status == 'PENDING' %}⏳ Pendiente
+                        {% else %}❌ Cancelado{% endif %}
+                    </div>
+                </div>
+                <div class="income-body">
+                    <div class="income-info">
+                        <strong>Fecha:</strong> {{ income.date.strftime('%d/%m/%Y') }}
+                    </div>
+                    <div class="income-info">
+                        <strong>Apartamento:</strong> {{ income.apartment.code if income.apartment else 'N/A' }}
+                    </div>
+                    {% if income.guest_email %}
+                    <div class="income-info">
+                        <strong>Email:</strong> {{ income.guest_email }}
+                    </div>
+                    {% endif %}
+                    {% if income.booking_reference %}
+                    <div class="income-info">
+                        <strong>Referencia:</strong> {{ income.booking_reference }}
+                    </div>
+                    {% endif %}
+                    {% if income.check_in_date %}
+                    <div class="income-info">
+                        <strong>Check-in:</strong> {{ income.check_in_date.strftime('%d/%m/%Y') }}
+                    </div>
+                    {% endif %}
+                    <div class="income-actions">
+                        {% if income.status == 'PENDING' %}
+                        <button class="btn btn-sm btn-success" onclick="changeStatus('{{ income.id }}', 'CONFIRMED')">
+                            ✅ Confirmar
+                        </button>
+                        {% endif %}
+                        {% if income.status == 'CONFIRMED' %}
+                        <button class="btn btn-sm btn-warning" onclick="changeStatus('{{ income.id }}', 'PENDING')">
+                            ⏳ Pendiente
+                        </button>
+                        {% endif %}
+                        <button class="btn btn-sm btn-danger" onclick="deleteIncome('{{ income.id }}', '{{ income.guest_name or 'Sin nombre' }}', {{ income.amount_gross }})">
+                            🗑️ Eliminar
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            
+            {% if not incomes %}
+            <div style="text-align: center; padding: 40px; color: #7f8c8d;">
+                <h3>📭 No hay ingresos</h3>
+                <p>No se encontraron ingresos{% if selected_apartment %} para {{ selected_apartment.code }}{% endif %}{% if status %} con estado {{ status }}{% endif %}.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Modal Crear Ingreso -->
+    <div id="incomeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h3>Nuevo Ingreso</h3>
+            </div>
+            <div class="modal-body">
+                <form id="incomeForm">
+                    <div class="form-group">
+                        <label for="apartment_id">Apartamento *</label>
+                        <select id="apartment_id" name="apartment_id" required>
+                            <option value="">Seleccionar apartamento</option>
+                            {% for apartment in apartments %}
+                            <option value="{{ apartment.id }}">{{ apartment.code }} - {{ apartment.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="date">Fecha *</label>
+                        <input type="date" id="date" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount_gross">Importe (€) *</label>
+                        <input type="number" id="amount_gross" name="amount_gross" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Estado *</label>
+                        <select id="status" name="status" required>
+                            <option value="CONFIRMED">✅ Confirmado</option>
+                            <option value="PENDING">⏳ Pendiente</option>
+                            <option value="CANCELLED">❌ Cancelado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="guest_name">Nombre del Huésped</label>
+                        <input type="text" id="guest_name" name="guest_name" placeholder="Nombre del huésped">
+                    </div>
+                    <div class="form-group">
+                        <label for="guest_email">Email del Huésped</label>
+                        <input type="email" id="guest_email" name="guest_email" placeholder="email@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="booking_reference">Referencia de Reserva</label>
+                        <input type="text" id="booking_reference" name="booking_reference" placeholder="BK001, AIR002, etc.">
+                    </div>
+                    <div class="form-group">
+                        <label for="check_in_date">Fecha Check-in</label>
+                        <input type="date" id="check_in_date" name="check_in_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="check_out_date">Fecha Check-out</label>
+                        <input type="date" id="check_out_date" name="check_out_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="guests_count">Número de Huéspedes</label>
+                        <input type="number" id="guests_count" name="guests_count" min="1" max="20">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="saveIncome()">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Establecer fecha actual por defecto
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        
+        function getAdminKey() {
+            let key = localStorage.getItem('admin_key');
+            if (!key) {
+                key = prompt('Introduce la clave de administrador:');
+                if (key) {
+                    localStorage.setItem('admin_key', key);
+                }
+            }
+            return key || '';
+        }
+        
+        function showAlert(message, type = 'success') {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+        
+        function filterIncomes() {
+            const apartmentId = document.getElementById('apartment-filter').value;
+            const status = document.getElementById('status-filter').value;
+            
+            let url = '/admin/manage/incomes?';
+            const params = [];
+            if (apartmentId) params.push(`apartment_id=${apartmentId}`);
+            if (status) params.push(`status=${status}`);
+            
+            window.location.href = url + params.join('&');
+        }
+        
+        function loadIncomes() {
+            window.location.reload();
+        }
+        
+        function openCreateModal() {
+            document.getElementById('incomeForm').reset();
+            document.getElementById('date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('incomeModal').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('incomeModal').style.display = 'none';
+        }
+        
+        async function saveIncome() {
+            const form = document.getElementById('incomeForm');
+            const formData = new FormData(form);
+            
+            const adminKey = getAdminKey();
+            if (!adminKey) {
+                showAlert('Clave de administrador requerida', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/manage/api/incomes?key=${encodeURIComponent(adminKey)}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(data.message, 'success');
+                    closeModal();
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(data.detail || 'Error creando ingreso', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error de conexión', 'danger');
+            }
+        }
+        
+        async function changeStatus(incomeId, newStatus) {
+            const adminKey = getAdminKey();
+            if (!adminKey) {
+                showAlert('Clave de administrador requerida', 'danger');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('status', newStatus);
+            
+            try {
+                const response = await fetch(`/admin/manage/api/incomes/${incomeId}/status?key=${encodeURIComponent(adminKey)}`, {
+                    method: 'PATCH',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(data.message, 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(data.detail || 'Error cambiando estado', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error de conexión', 'danger');
+            }
+        }
+        
+        async function deleteIncome(incomeId, guestName, amount) {
+            if (!confirm(`¿Estás seguro de que quieres eliminar este ingreso?\n\nHuésped: ${guestName}\nImporte: €${amount}`)) {
+                return;
+            }
+            
+            const adminKey = getAdminKey();
+            if (!adminKey) {
+                showAlert('Clave de administrador requerida', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/manage/api/incomes/${incomeId}?key=${encodeURIComponent(adminKey)}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert(data.message, 'success');
+                    // Remover la tarjeta del DOM
+                    const card = document.querySelector(`[data-income-id="${incomeId}"]`);
+                    if (card) {
+                        card.remove();
+                        // Actualizar contador
+                        const count = document.getElementById('incomes-count');
+                        count.textContent = parseInt(count.textContent) - 1;
+                    }
+                } else {
+                    showAlert(data.detail || 'Error eliminando ingreso', 'danger');
+                }
+            } catch (error) {
+                showAlert('Error de conexión', 'danger');
+            }
+        }
+        
+        // Cerrar modal al hacer clic fuera
+        window.onclick = function(event) {
+            const modal = document.getElementById('incomeModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
