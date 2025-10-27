@@ -1,7 +1,7 @@
 # app/dashboard_api.py
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, desc
@@ -14,6 +14,7 @@ import os
 from app.db import get_db
 from app import models
 from app.schemas import DashboardMonthSummary, DashboardMonthlyResponse
+from app.auth_multiuser import get_current_account, require_member_or_above
 
 # Initialize templates with absolute path
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
@@ -82,12 +83,19 @@ def _i(x) -> int:
 def dashboard_monthly(
     year: int = Query(..., description="Ej: 2025"),
     apartment_code: Optional[str] = Query(None, description="Opcional: SES01 para filtrar"),
+    current_account: models.Account = Depends(get_current_account),
+    membership: models.AccountUser = Depends(require_member_or_above),
     db: Session = Depends(get_db),
 ):
-    # Resuelve apartment_id si llega apartment_code
+    # Resuelve apartment_id si llega apartment_code (SOLO de la cuenta actual)
     apartment_id = None
     if apartment_code:
-        apt = db.query(models.Apartment).filter(models.Apartment.code == apartment_code).first()
+        apt = db.query(models.Apartment).filter(
+            and_(
+                models.Apartment.code == apartment_code,
+                models.Apartment.account_id == current_account.id
+            )
+        ).first()
         if not apt:
             # no existe ese código: devolvemos meses a cero
             return {
@@ -107,16 +115,25 @@ def dashboard_monthly(
             }
         apartment_id = apt.id
 
-    # Filtros comunes
+    # Filtros comunes - SOLO apartamentos de la cuenta actual
+    account_apartments = db.query(models.Apartment.id).filter(
+        models.Apartment.account_id == current_account.id
+    ).subquery()
+    
     exp_filter = [
-        func.extract("year", models.Expense.date) == year
+        func.extract("year", models.Expense.date) == year,
+        models.Expense.apartment_id.in_(account_apartments)
     ]
     res_filter = [
-        func.extract("year", models.Reservation.check_in) == year
+        func.extract("year", models.Reservation.check_in) == year,
+        models.Reservation.apartment_id.in_(account_apartments)
     ]
     inc_filter = [
-        func.extract("year", models.Income.date) == year
+        func.extract("year", models.Income.date) == year,
+        models.Income.apartment_id.in_(account_apartments)
     ]
+    
+    # Filtro adicional por apartamento específico si se proporciona
     if apartment_id:
         exp_filter.append(models.Expense.apartment_id == apartment_id)
         res_filter.append(models.Reservation.apartment_id == apartment_id)
@@ -189,12 +206,10 @@ def dashboard_monthly(
 
 @router.get("/", response_class=HTMLResponse)
 def dashboard_page(request: Request):
-    """Serve the dashboard HTML page"""
+    """Serve the dashboard HTML page - Redirect to multiuser login"""
     try:
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request,
-            "db_error": None
-        })
+        # Redirect to multiuser system
+        return RedirectResponse(url="/multiuser/login?redirect=/multiuser/dashboard", status_code=302)
     except Exception as e:
         print(f"Error loading dashboard template: {e}")
         # Try to return a simple error page instead of failing completely
@@ -205,7 +220,7 @@ def dashboard_page(request: Request):
         <body>
             <h1>Dashboard Error</h1>
             <p>Error loading dashboard: {str(e)}</p>
-            <p><a href="/api/v1/dashboard/health">Check System Health</a></p>
+            <p><a href="/multiuser/login">Login to Continue</a></p>
         </body>
         </html>
         """
@@ -216,12 +231,14 @@ def dashboard_content(
     request: Request,
     year: int = Query(default=datetime.now().year, description="Ej: 2025"),
     apartment_code: Optional[str] = Query(None, description="Opcional: SES01 para filtrar"),
+    current_account: models.Account = Depends(get_current_account),
+    membership: models.AccountUser = Depends(require_member_or_above),
     db: Session = Depends(get_db),
 ):
     """Serve dashboard content for HTMX updates"""
     try:
         # Get basic dashboard data
-        data = dashboard_monthly(year, apartment_code, db)
+        data = dashboard_monthly(year, apartment_code, current_account, membership, db)
         
         # Convert to JSON for JavaScript
         data_json = json.dumps(data, default=str)
@@ -244,11 +261,11 @@ def dashboard_content(
             <p><strong>Error:</strong> {str(e)}</p>
             <p><strong>Possible causes:</strong></p>
             <ul>
+                <li>Not logged in to multiuser system</li>
                 <li>Database connection issues</li>
                 <li>Missing or incorrect database credentials</li>
-                <li>Database tables not created</li>
             </ul>
-            <p><a href="/api/v1/dashboard/health" style="color: #2563eb;">🔍 Check system health</a></p>
+            <p><a href="/multiuser/login" style="color: #2563eb;">🔐 Login to Continue</a></p>
         </div>
         '''
         return HTMLResponse(content=error_html)
@@ -257,12 +274,14 @@ def dashboard_content(
 def dashboard_data(
     year: int = Query(default=datetime.now().year, description="Ej: 2025"),
     apartment_code: Optional[str] = Query(None, description="Opcional: SES01 para filtrar"),
+    current_account: models.Account = Depends(get_current_account),
+    membership: models.AccountUser = Depends(require_member_or_above),
     db: Session = Depends(get_db),
 ):
     """Enhanced dashboard data with additional metrics"""
     try:
         # Get the base monthly data
-        monthly_data = dashboard_monthly(year, apartment_code, db)
+        monthly_data = dashboard_monthly(year, apartment_code, current_account, membership, db)
         return monthly_data
     except Exception as e:
         print(f"Error in dashboard_data: {e}")
@@ -284,19 +303,32 @@ def dashboard_data(
         }
 
 @router.get("/apartments")
-def get_apartments(db: Session = Depends(get_db)):
-    """Get list of apartments for filter dropdown"""
-    apartments = db.query(models.Apartment).filter(models.Apartment.is_active == True).all()
+def get_apartments(
+    current_account: models.Account = Depends(get_current_account),
+    membership: models.AccountUser = Depends(require_member_or_above),
+    db: Session = Depends(get_db)
+):
+    """Get list of apartments for filter dropdown - SOLO de la cuenta actual"""
+    apartments = db.query(models.Apartment).filter(
+        and_(
+            models.Apartment.is_active == True,
+            models.Apartment.account_id == current_account.id
+        )
+    ).all()
     return [{"code": apt.code, "name": apt.name or apt.code} for apt in apartments]
 
 @router.get("/recent-expenses")
 def get_recent_expenses(
     limit: int = Query(default=10, le=50),
     apartment_code: Optional[str] = Query(None),
+    current_account: models.Account = Depends(get_current_account),
+    membership: models.AccountUser = Depends(require_member_or_above),
     db: Session = Depends(get_db)
 ):
-    """Get recent expenses for the activity feed"""
-    q = db.query(models.Expense).join(models.Apartment)
+    """Get recent expenses for the activity feed - SOLO de la cuenta actual"""
+    q = db.query(models.Expense).join(models.Apartment).filter(
+        models.Apartment.account_id == current_account.id
+    )
     
     if apartment_code:
         q = q.filter(models.Apartment.code == apartment_code)
@@ -370,24 +402,42 @@ def debug_expenses(
 def get_summary_stats(
     year: int = Query(default=datetime.now().year),
     apartment_code: Optional[str] = Query(None),
+    current_account: models.Account = Depends(get_current_account),
+    membership: models.AccountUser = Depends(require_member_or_above),
     db: Session = Depends(get_db)
 ):
-    """Get summary statistics for the dashboard"""
+    """Get summary statistics for the dashboard - SOLO de la cuenta actual"""
     
-    # Base filters
+    # Base filters - SOLO apartamentos de la cuenta actual
     apartment_id = None
     if apartment_code:
-        apt = db.query(models.Apartment).filter(models.Apartment.code == apartment_code).first()
+        apt = db.query(models.Apartment).filter(
+            and_(
+                models.Apartment.code == apartment_code,
+                models.Apartment.account_id == current_account.id
+            )
+        ).first()
         if apt:
             apartment_id = apt.id
     
-    # Current year filters
-    current_filters = [func.extract("year", models.Expense.date) == year]
+    # Obtener IDs de apartamentos de la cuenta actual
+    account_apartments = db.query(models.Apartment.id).filter(
+        models.Apartment.account_id == current_account.id
+    ).subquery()
+    
+    # Current year filters - SOLO apartamentos de la cuenta
+    current_filters = [
+        func.extract("year", models.Expense.date) == year,
+        models.Expense.apartment_id.in_(account_apartments)
+    ]
     if apartment_id:
         current_filters.append(models.Expense.apartment_id == apartment_id)
     
-    # Previous year filters for comparison
-    prev_filters = [func.extract("year", models.Expense.date) == year - 1]
+    # Previous year filters for comparison - SOLO apartamentos de la cuenta
+    prev_filters = [
+        func.extract("year", models.Expense.date) == year - 1,
+        models.Expense.apartment_id.in_(account_apartments)
+    ]
     if apartment_id:
         prev_filters.append(models.Expense.apartment_id == apartment_id)
     
@@ -406,9 +456,15 @@ def get_summary_stats(
     if prev_expenses > 0:
         expense_change = ((current_expenses - prev_expenses) / prev_expenses) * 100
     
-    # Get income data (similar logic)
-    inc_current_filters = [func.extract("year", models.Income.date) == year]
-    inc_prev_filters = [func.extract("year", models.Income.date) == year - 1]
+    # Get income data (similar logic) - SOLO apartamentos de la cuenta
+    inc_current_filters = [
+        func.extract("year", models.Income.date) == year,
+        models.Income.apartment_id.in_(account_apartments)
+    ]
+    inc_prev_filters = [
+        func.extract("year", models.Income.date) == year - 1,
+        models.Income.apartment_id.in_(account_apartments)
+    ]
     if apartment_id:
         inc_current_filters.append(models.Income.apartment_id == apartment_id)
         inc_prev_filters.append(models.Income.apartment_id == apartment_id)
