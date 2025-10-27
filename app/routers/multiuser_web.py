@@ -212,6 +212,10 @@ async def dashboard_page(request: Request):
             async function loadApartments() {
                 const token = localStorage.getItem('access_token');
                 
+                console.log('🔍 Loading apartments...');
+                console.log('Token:', token ? 'Present' : 'Missing');
+                console.log('Account ID:', currentAccountId);
+                
                 try {
                     const response = await fetch('/api/v1/apartments/', {
                         headers: {
@@ -220,14 +224,19 @@ async def dashboard_page(request: Request):
                         }
                     });
 
+                    console.log('Response status:', response.status);
+                    
                     if (response.ok) {
                         const apartments = await response.json();
+                        console.log('✅ Apartments loaded:', apartments);
                         displayDashboard(apartments);
                     } else {
+                        const errorText = await response.text();
+                        console.error('❌ Apartments error:', response.status, errorText);
                         displayNoApartments();
                     }
                 } catch (error) {
-                    console.error('Error loading apartments:', error);
+                    console.error('❌ Network error loading apartments:', error);
                     displayNoApartments();
                 }
             }
@@ -247,6 +256,8 @@ async def dashboard_page(request: Request):
             }
 
             function displayDashboard(apartments) {
+                // Guardar apartamentos globalmente para otras funciones
+                window.currentApartments = apartments;
                 const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
                 
                 document.getElementById('dashboardContent').innerHTML = `
@@ -322,7 +333,9 @@ async def dashboard_page(request: Request):
             }
 
             function showBotInstructions() {
-                const firstApartment = apartments.length > 0 ? apartments[0] : null;
+                // Usar apartamentos cargados globalmente
+                const apartmentsList = window.currentApartments || [];
+                const firstApartment = apartmentsList.length > 0 ? apartmentsList[0] : null;
                 const apartmentCode = firstApartment ? firstApartment.code : 'TU_CODIGO';
                 
                 alert(`🤖 Instrucciones del Bot:
@@ -338,6 +351,7 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
             function openFullDashboard() {
                 // Redirigir al dashboard financiero completo (legacy)
                 const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
+                const apartmentsList = window.currentApartments || [];
                 
                 // Opción 1: Dashboard legacy existente
                 window.open('/api/v1/dashboard/', '_blank');
@@ -346,7 +360,7 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
                 alert(`📊 Dashboard Financiero Completo
 
 🏠 Cuenta: ${currentAccount?.name}
-📈 Apartamentos: ${apartments.length}
+📈 Apartamentos: ${apartmentsList.length}
 
 El dashboard completo se abrirá en una nueva pestaña con:
 • Gráficos interactivos
