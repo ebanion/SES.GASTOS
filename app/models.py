@@ -263,7 +263,7 @@ class User(Base):
     last_login = Column(DateTime(timezone=True), nullable=True)
 
     # Relaciones
-    account_memberships = relationship("AccountUser", back_populates="user", cascade="all,delete")
+    account_memberships = relationship("AccountUser", back_populates="user", foreign_keys="AccountUser.user_id", cascade="all,delete")
 
 # ---------- RELACIÓN USUARIO-CUENTA (MEMBRESÍAS) ----------
 class AccountUser(Base):
