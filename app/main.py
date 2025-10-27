@@ -1914,6 +1914,98 @@ def create_superadmin(
             "error": str(e)
         }
 
+@app.post("/quick-setup")
+def quick_setup():
+    """Setup rápido del sistema multiusuario (solo para SQLite)"""
+    try:
+        from .db import SessionLocal, engine, Base
+        from .models import User, Account, AccountUser
+        from .auth_multiuser import get_password_hash, create_account_slug, ensure_unique_slug
+        from datetime import datetime, timezone, timedelta
+        
+        # Crear todas las tablas
+        Base.metadata.create_all(bind=engine)
+        
+        db = SessionLocal()
+        try:
+            # Verificar si ya existe superadmin
+            existing_admin = db.query(User).filter(User.is_superadmin == True).first()
+            if existing_admin:
+                return {
+                    "success": True,
+                    "message": "Sistema ya configurado",
+                    "admin_email": existing_admin.email
+                }
+            
+            # Crear superadmin
+            admin_user = User(
+                email="admin@sesgas.com",
+                full_name="Administrador Sistema",
+                password_hash=get_password_hash("admin123"),
+                is_active=True,
+                is_superadmin=True
+            )
+            db.add(admin_user)
+            db.flush()
+            
+            # Crear cuenta demo
+            demo_account = Account(
+                name="Cuenta Demo",
+                slug="demo",
+                contact_email="demo@sesgas.com",
+                description="Cuenta de demostración del sistema",
+                max_apartments=50,
+                trial_ends_at=datetime.now(timezone.utc) + timedelta(days=30)
+            )
+            db.add(demo_account)
+            db.flush()
+            
+            # Crear usuario demo
+            demo_user = User(
+                email="demo@sesgas.com",
+                full_name="Usuario Demo",
+                password_hash=get_password_hash("demo123"),
+                is_active=True,
+                is_superadmin=False
+            )
+            db.add(demo_user)
+            db.flush()
+            
+            # Crear membresía demo
+            demo_membership = AccountUser(
+                account_id=demo_account.id,
+                user_id=demo_user.id,
+                role="owner",
+                invitation_accepted_at=datetime.now(timezone.utc)
+            )
+            db.add(demo_membership)
+            
+            db.commit()
+            
+            return {
+                "success": True,
+                "message": "✅ Sistema configurado exitosamente",
+                "credentials": {
+                    "superadmin": {"email": "admin@sesgas.com", "password": "admin123"},
+                    "demo_user": {"email": "demo@sesgas.com", "password": "demo123"}
+                },
+                "next_steps": [
+                    "1. Ir a /multiuser/login",
+                    "2. Usar credenciales de superadmin o demo",
+                    "3. Probar el sistema multiusuario"
+                ]
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error en configuración rápida"
+        }
+
 @app.get("/bot/diagnose")
 async def diagnose_bot():
     """Diagnóstico completo del bot de Telegram"""
