@@ -375,9 +375,7 @@
                     <label for="apartmentSelect">Apartamento:</label>
                     <select id="apartmentSelect" class="select" hx-get="/api/v1/dashboard/content" hx-trigger="change" hx-target="#dashboardContent" hx-include="#yearSelect">
                         <option value="">Todos los apartamentos</option>
-                        <option value="SES01">SES01</option>
-                        <option value="SES02">SES02</option>
-                        <option value="SES03">SES03</option>
+                        <!-- Los apartamentos se cargarán dinámicamente -->
                     </select>
                 </div>
                 
@@ -625,6 +623,42 @@
             }
         });
 
+        // Load apartments dynamically
+        async function loadApartments() {
+            try {
+                const response = await fetch('/api/v1/dashboard/apartments');
+                if (response.ok) {
+                    const apartments = await response.json();
+                    const select = document.getElementById('apartmentSelect');
+                    
+                    // Clear existing options except "Todos"
+                    while (select.children.length > 1) {
+                        select.removeChild(select.lastChild);
+                    }
+                    
+                    // Add apartments
+                    apartments.forEach(apt => {
+                        const option = document.createElement('option');
+                        option.value = apt.code;
+                        option.textContent = `${apt.code} - ${apt.name}`;
+                        select.appendChild(option);
+                    });
+                    
+                    console.log(`✅ ${apartments.length} apartamentos cargados dinámicamente`);
+                } else {
+                    console.warn('⚠️ No se pudieron cargar apartamentos:', response.status);
+                }
+            } catch (error) {
+                console.error('❌ Error cargando apartamentos:', error);
+            }
+        }
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadApartments();
+            refreshDashboard();
+        });
+        
         // Auto-refresh every 5 minutes
         setInterval(refreshDashboard, 5 * 60 * 1000);
     </script>
