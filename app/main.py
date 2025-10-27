@@ -328,6 +328,20 @@ def on_shutdown() -> None:
 def health():
     return {"ok": True}
 
+@app.get("/debug/test")
+def debug_test():
+    """Test endpoint para verificar que los endpoints de debug funcionan"""
+    return {
+        "status": "ok",
+        "message": "Debug endpoints funcionando",
+        "available_endpoints": [
+            "/debug/test",
+            "/debug/multitenancy",
+            "/debug/multitenancy-page",
+            "/fix-multitenancy"
+        ]
+    }
+
 @app.post("/test-login")
 def test_login():
     """Test simple de login"""
