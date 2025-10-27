@@ -292,11 +292,19 @@ async def dashboard_page(request: Request):
                         <div class="card">
                             <h3>📊 Resumen Financiero</h3>
                             <p>Gastos e ingresos de este mes</p>
-                            <div style="margin-top: 16px;">
-                                <div>💰 Ingresos: <strong>0 €</strong></div>
-                                <div>💸 Gastos: <strong>0 €</strong></div>
-                                <div>📈 Balance: <strong>0 €</strong></div>
+                            <div style="margin-top: 16px; margin-bottom: 16px;">
+                                <div style="padding: 4px 0;">💰 Ingresos: <strong>0 €</strong></div>
+                                <div style="padding: 4px 0;">💸 Gastos: <strong>0 €</strong></div>
+                                <div style="padding: 4px 0;">📈 Balance: <strong>0 €</strong></div>
                             </div>
+                            <button onclick="openFullDashboard()" class="btn" 
+                                    style="background: #667eea; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-size: 14px;">
+                                📊 Ver Dashboard Completo
+                            </button>
+                            <button onclick="openReports()" class="btn" 
+                                    style="background: #f8f9fa; color: #333; padding: 8px 16px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 8px; font-size: 14px;">
+                                📈 Generar Reportes
+                            </button>
                         </div>
                     </div>
 
@@ -314,7 +322,9 @@ async def dashboard_page(request: Request):
             }
 
             function showBotInstructions() {
-                const apartmentCode = apartments.length > 0 ? apartments[0].code : 'TU_CODIGO';
+                const firstApartment = apartments.length > 0 ? apartments[0] : null;
+                const apartmentCode = firstApartment ? firstApartment.code : 'TU_CODIGO';
+                
                 alert(`🤖 Instrucciones del Bot:
 
 1. Abre Telegram y busca: @UriApartment_Bot
@@ -323,6 +333,39 @@ async def dashboard_page(request: Request):
 4. ¡Envía una foto de factura!
 
 El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`);
+            }
+
+            function openFullDashboard() {
+                // Redirigir al dashboard financiero completo (legacy)
+                const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
+                
+                // Opción 1: Dashboard legacy existente
+                window.open('/api/v1/dashboard/', '_blank');
+                
+                // Opción 2: Mostrar información adicional
+                alert(`📊 Dashboard Financiero Completo
+
+🏠 Cuenta: ${currentAccount?.name}
+📈 Apartamentos: ${apartments.length}
+
+El dashboard completo se abrirá en una nueva pestaña con:
+• Gráficos interactivos
+• Filtros por apartamento  
+• Exportación de datos
+• Análisis detallado`);
+            }
+
+            function openReports() {
+                alert(`📈 Reportes Disponibles:
+
+• 📊 Resumen mensual por apartamento
+• 💰 Análisis de ingresos vs gastos
+• 📋 Exportación a Excel/PDF
+• 📈 Gráficos de tendencias
+• 🏷️ Gastos por categoría
+
+Esta funcionalidad se está desarrollando.
+Por ahora usa el Dashboard Completo.`);
             }
 
             function logout() {
