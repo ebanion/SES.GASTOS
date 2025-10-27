@@ -372,23 +372,232 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
             }
 
             function openFullDashboard() {
-                // Redirigir al dashboard financiero completo (legacy)
+                // Crear dashboard integrado en la misma página
                 const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
                 
-                // Opción 1: Dashboard legacy existente
-                window.open('/api/v1/dashboard/', '_blank');
+                // Mostrar dashboard financiero integrado
+                document.getElementById('dashboardContent').innerHTML = `
+                    <div class="welcome-message">
+                        <h2>📊 Dashboard Financiero - ${currentAccount?.name}</h2>
+                        <button onclick="loadUserData()" class="btn" style="background: #667eea; color: white;">← Volver al Dashboard Principal</button>
+                    </div>
+                    
+                    <div class="grid">
+                        <div class="card">
+                            <h3>📈 Resumen del Año 2025</h3>
+                            <div id="yearlyStats">Cargando estadísticas...</div>
+                        </div>
+                        
+                        <div class="card">
+                            <h3>🏠 Filtrar por Apartamento</h3>
+                            <select id="apartmentFilter" onchange="filterByApartment()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="">Todos los apartamentos</option>
+                                ${apartments.map(apt => `<option value="${apt.code}">${apt.code} - ${apt.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="card" style="grid-column: 1 / -1;">
+                            <h3>📊 Gráfico Mensual</h3>
+                            <div id="monthlyChart">
+                                <canvas id="chartCanvas" width="800" height="400" style="max-width: 100%; border: 1px solid #eee;"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <h3>💸 Gastos Recientes</h3>
+                            <div id="recentExpenses">Cargando gastos...</div>
+                        </div>
+                        
+                        <div class="card">
+                            <h3>💰 Ingresos Recientes</h3>
+                            <div id="recentIncomes">Cargando ingresos...</div>
+                        </div>
+                    </div>
+                `;
                 
-                // Opción 2: Mostrar información adicional
-                alert(`📊 Dashboard Financiero Completo
-
-🏠 Cuenta: ${currentAccount?.name}
-📈 Apartamentos: ${apartments.length}
-
-El dashboard completo se abrirá en una nueva pestaña con:
-• Gráficos interactivos
-• Filtros por apartamento  
-• Exportación de datos
-• Análisis detallado`);
+                // Cargar datos del dashboard
+                loadDashboardData();
+            }
+            
+            async function loadDashboardData() {
+                const token = localStorage.getItem('access_token');
+                
+                try {
+                    // Cargar datos mensuales
+                    const monthlyResponse = await fetch('/api/v1/dashboard/monthly?year=2025', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'X-Account-ID': currentAccountId
+                        }
+                    });
+                    
+                    if (monthlyResponse.ok) {
+                        const monthlyData = await monthlyResponse.json();
+                        displayMonthlyChart(monthlyData);
+                        displayYearlyStats(monthlyData);
+                    } else {
+                        document.getElementById('yearlyStats').innerHTML = '<p style="color: #f44336;">Error cargando estadísticas</p>';
+                    }
+                    
+                    // Cargar gastos recientes
+                    const expensesResponse = await fetch('/api/v1/dashboard/recent-expenses', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'X-Account-ID': currentAccountId
+                        }
+                    });
+                    
+                    if (expensesResponse.ok) {
+                        const expenses = await expensesResponse.json();
+                        displayRecentExpenses(expenses);
+                    } else {
+                        document.getElementById('recentExpenses').innerHTML = '<p>No hay gastos recientes</p>';
+                    }
+                    
+                } catch (error) {
+                    console.error('Error loading dashboard data:', error);
+                    document.getElementById('yearlyStats').innerHTML = '<p style="color: #f44336;">Error de conexión</p>';
+                }
+            }
+            
+            function displayYearlyStats(data) {
+                const totalIncome = data.items.reduce((sum, item) => sum + item.incomes_accepted + item.incomes_pending, 0);
+                const totalExpenses = data.items.reduce((sum, item) => sum + item.expenses, 0);
+                const netProfit = totalIncome - totalExpenses;
+                
+                document.getElementById('yearlyStats').innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; text-align: center;">
+                        <div>
+                            <div style="font-size: 24px; font-weight: bold; color: #4caf50;">€${totalIncome.toFixed(2)}</div>
+                            <div style="color: #666; font-size: 14px;">Ingresos Totales</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; font-weight: bold; color: #f44336;">€${totalExpenses.toFixed(2)}</div>
+                            <div style="color: #666; font-size: 14px;">Gastos Totales</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; font-weight: bold; color: ${netProfit >= 0 ? '#4caf50' : '#f44336'};">€${netProfit.toFixed(2)}</div>
+                            <div style="color: #666; font-size: 14px;">Beneficio Neto</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            function displayMonthlyChart(data) {
+                const canvas = document.getElementById('chartCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Limpiar canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Configuración del gráfico
+                const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                const padding = 60;
+                const chartWidth = canvas.width - 2 * padding;
+                const chartHeight = canvas.height - 2 * padding;
+                
+                // Encontrar valores máximos
+                const maxValue = Math.max(
+                    ...data.items.map(item => Math.max(item.incomes_accepted + item.incomes_pending, item.expenses))
+                );
+                
+                if (maxValue === 0) {
+                    ctx.fillStyle = '#666';
+                    ctx.font = '16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('No hay datos para mostrar', canvas.width / 2, canvas.height / 2);
+                    return;
+                }
+                
+                // Dibujar ejes
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(padding, padding);
+                ctx.lineTo(padding, canvas.height - padding);
+                ctx.lineTo(canvas.width - padding, canvas.height - padding);
+                ctx.stroke();
+                
+                // Dibujar datos
+                const barWidth = chartWidth / 12;
+                
+                data.items.forEach((item, index) => {
+                    const x = padding + index * barWidth + barWidth * 0.1;
+                    const incomeHeight = (item.incomes_accepted + item.incomes_pending) / maxValue * chartHeight;
+                    const expenseHeight = item.expenses / maxValue * chartHeight;
+                    
+                    // Barra de ingresos (verde)
+                    ctx.fillStyle = '#4caf50';
+                    ctx.fillRect(x, canvas.height - padding - incomeHeight, barWidth * 0.35, incomeHeight);
+                    
+                    // Barra de gastos (rojo)
+                    ctx.fillStyle = '#f44336';
+                    ctx.fillRect(x + barWidth * 0.4, canvas.height - padding - expenseHeight, barWidth * 0.35, expenseHeight);
+                    
+                    // Etiquetas de meses
+                    ctx.fillStyle = '#666';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(months[index], x + barWidth * 0.4, canvas.height - padding + 20);
+                });
+                
+                // Leyenda
+                ctx.fillStyle = '#4caf50';
+                ctx.fillRect(padding, 20, 15, 15);
+                ctx.fillStyle = '#666';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText('Ingresos', padding + 20, 32);
+                
+                ctx.fillStyle = '#f44336';
+                ctx.fillRect(padding + 100, 20, 15, 15);
+                ctx.fillStyle = '#666';
+                ctx.fillText('Gastos', padding + 120, 32);
+            }
+            
+            function displayRecentExpenses(expenses) {
+                if (expenses.length === 0) {
+                    document.getElementById('recentExpenses').innerHTML = '<p>No hay gastos recientes</p>';
+                    return;
+                }
+                
+                document.getElementById('recentExpenses').innerHTML = expenses.slice(0, 5).map(expense => `
+                    <div style="padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+                        <div>
+                            <strong>${expense.vendor || 'Sin proveedor'}</strong><br>
+                            <small style="color: #666;">${expense.category || 'Sin categoría'} • ${expense.date}</small>
+                        </div>
+                        <div style="text-align: right; color: #f44336; font-weight: bold;">
+                            €${expense.amount.toFixed(2)}
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            async function filterByApartment() {
+                const selectedApartment = document.getElementById('apartmentFilter').value;
+                const token = localStorage.getItem('access_token');
+                
+                try {
+                    const url = selectedApartment 
+                        ? `/api/v1/dashboard/monthly?year=2025&apartment_code=${selectedApartment}`
+                        : '/api/v1/dashboard/monthly?year=2025';
+                        
+                    const response = await fetch(url, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'X-Account-ID': currentAccountId
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        displayMonthlyChart(data);
+                        displayYearlyStats(data);
+                    }
+                } catch (error) {
+                    console.error('Error filtering data:', error);
+                }
             }
 
             function openReports() {
