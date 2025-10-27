@@ -315,6 +315,72 @@ def on_shutdown() -> None:
 def health():
     return {"ok": True}
 
+@app.get("/system-status")
+def system_status():
+    """Diagnóstico completo del sistema"""
+    try:
+        from .db import engine, DATABASE_URL
+        from sqlalchemy import text
+        import os
+        
+        # Test de base de datos
+        db_status = "unknown"
+        db_type = "unknown"
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            db_status = "connected"
+            db_type = "postgresql" if "postgresql" in DATABASE_URL else "sqlite"
+        except Exception as e:
+            db_status = f"error: {str(e)[:100]}"
+        
+        # Test de imports multiusuario
+        multiuser_imports = {}
+        try:
+            import jwt
+            multiuser_imports["jwt"] = "✅ OK"
+        except ImportError as e:
+            multiuser_imports["jwt"] = f"❌ {str(e)}"
+        
+        try:
+            from .auth_multiuser import get_current_user
+            multiuser_imports["auth_multiuser"] = "✅ OK"
+        except ImportError as e:
+            multiuser_imports["auth_multiuser"] = f"❌ {str(e)}"
+        
+        try:
+            from .routers.accounts import router as accounts_router
+            multiuser_imports["accounts_router"] = "✅ OK"
+        except ImportError as e:
+            multiuser_imports["accounts_router"] = f"❌ {str(e)}"
+        
+        return {
+            "system": "SES.GASTOS Multiuser",
+            "database": {
+                "status": db_status,
+                "type": db_type,
+                "url_masked": DATABASE_URL.replace(DATABASE_URL.split('@')[0].split(':')[-1], '***') if '@' in DATABASE_URL else DATABASE_URL
+            },
+            "multiuser_system": multiuser_imports,
+            "environment": {
+                "DATABASE_URL": "SET" if os.getenv("DATABASE_URL") else "NOT_SET",
+                "TELEGRAM_TOKEN": "SET" if os.getenv("TELEGRAM_TOKEN") else "NOT_SET",
+                "OPENAI_API_KEY": "SET" if os.getenv("OPENAI_API_KEY") else "NOT_SET"
+            },
+            "available_endpoints": {
+                "multiuser_login": "/multiuser/login",
+                "multiuser_register": "/multiuser/register",
+                "migration_status": "/migrate/status",
+                "superadmin": "/multiuser/superadmin"
+            }
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "system": "SES.GASTOS Multiuser",
+            "status": "error"
+        }
+
 @app.post("/force-postgres")
 def force_postgres_connection():
     """Forzar cambio a PostgreSQL en tiempo real"""
@@ -831,9 +897,17 @@ def root():
     return {
         "message": "🏠 SES.GASTOS - Sistema de Gestión de Gastos",
         "status": "active",
-        "auth": "/auth/",
-        "dashboard": "/dashboard/",
-        "health": "/health"
+        "multiuser": {
+            "login": "/multiuser/login",
+            "register": "/multiuser/register",
+            "superadmin": "/multiuser/superadmin"
+        },
+        "legacy": {
+            "auth": "/auth/",
+            "dashboard": "/dashboard/"
+        },
+        "health": "/health",
+        "migration": "/migrate/status"
     }
 
 @app.get("/dashboard")

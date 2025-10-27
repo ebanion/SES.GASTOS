@@ -298,8 +298,8 @@ class AccountUser(Base):
 
     # Relaciones
     account = relationship("Account", back_populates="account_users")
-    user = relationship("User", back_populates="account_memberships")
-    invited_by_user = relationship("User", foreign_keys=[invited_by])
+    user = relationship("User", back_populates="account_memberships", foreign_keys=[user_id])
+    invited_by_user = relationship("User", foreign_keys=[invited_by], post_update=True)
 
     # Constraint único: un usuario solo puede tener un rol por cuenta
     __table_args__ = (
