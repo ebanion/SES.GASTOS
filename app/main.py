@@ -198,6 +198,18 @@ def on_startup() -> None:
         if existing_apartments == 0:
             print("[startup] No apartments found, creating default apartments...")
             
+            # Crear cuenta por defecto si no existe
+            default_account = db.query(models.Account).filter(models.Account.slug == "sistema").first()
+            if not default_account:
+                default_account = models.Account(
+                    name="Sistema",
+                    slug="sistema",
+                    description="Cuenta por defecto del sistema",
+                    max_apartments=1000
+                )
+                db.add(default_account)
+                db.flush()  # Para obtener el ID
+            
             default_apartments = [
                 {"code": "SES01", "name": "Apartamento Centro", "owner_email": "admin@sesgas.com"},
                 {"code": "SES02", "name": "Apartamento Playa", "owner_email": "admin@sesgas.com"},
@@ -209,6 +221,7 @@ def on_startup() -> None:
                     code=apt_data["code"],
                     name=apt_data["name"],
                     owner_email=apt_data["owner_email"],
+                    account_id=default_account.id,  # AGREGAR CUENTA
                     is_active=True
                 )
                 db.add(apt)
