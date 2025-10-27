@@ -2115,6 +2115,136 @@ def migrate_to_multiuser():
             "message": "Error en migración multiusuario"
         }
 
+@app.post("/migrate/render-fix")
+def migrate_render_fix():
+    """Migración específica para Render - Arregla estructura PostgreSQL"""
+    import os
+    from sqlalchemy import create_engine, text
+    
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return {"success": False, "error": "DATABASE_URL no configurada"}
+    
+    try:
+        engine = create_engine(database_url, pool_pre_ping=True)
+        
+        migrations = []
+        
+        with engine.connect() as conn:
+            # Lista de migraciones críticas
+            migration_queries = [
+                "ALTER TABLE apartments ADD COLUMN IF NOT EXISTS description VARCHAR(500)",
+                "ALTER TABLE apartments ADD COLUMN IF NOT EXISTS address VARCHAR(500)", 
+                "ALTER TABLE apartments ADD COLUMN IF NOT EXISTS max_guests INTEGER",
+                "ALTER TABLE apartments ADD COLUMN IF NOT EXISTS bedrooms INTEGER",
+                "ALTER TABLE apartments ADD COLUMN IF NOT EXISTS bathrooms INTEGER",
+                "ALTER TABLE apartments ADD COLUMN IF NOT EXISTS account_id VARCHAR(36)",
+                "ALTER TABLE apartments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE",
+                
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50)",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500)",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Europe/Madrid'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'es'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITH TIME ZONE",
+            ]
+            
+            for query in migration_queries:
+                try:
+                    conn.execute(text(query))
+                    migrations.append(f"✅ {query[:50]}...")
+                except Exception as e:
+                    migrations.append(f"⚠️ {query[:50]}... -> {str(e)[:50]}")
+            
+            # Crear tabla accounts
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS accounts (
+                        id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                        name VARCHAR(255) NOT NULL,
+                        slug VARCHAR(100) UNIQUE NOT NULL,
+                        description VARCHAR(500),
+                        is_active BOOLEAN DEFAULT TRUE,
+                        subscription_status VARCHAR(20) DEFAULT 'trial',
+                        max_apartments INTEGER DEFAULT 10,
+                        contact_email VARCHAR(255),
+                        phone VARCHAR(50),
+                        address VARCHAR(500),
+                        tax_id VARCHAR(50),
+                        trial_ends_at TIMESTAMP WITH TIME ZONE,
+                        subscription_ends_at TIMESTAMP WITH TIME ZONE,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE
+                    )
+                """))
+                migrations.append("✅ Tabla accounts creada")
+            except Exception as e:
+                migrations.append(f"⚠️ Tabla accounts: {str(e)[:50]}")
+            
+            # Crear tabla account_users
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS account_users (
+                        id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                        account_id VARCHAR(36) NOT NULL,
+                        user_id VARCHAR(36) NOT NULL,
+                        role VARCHAR(20) NOT NULL DEFAULT 'member',
+                        is_active BOOLEAN DEFAULT TRUE,
+                        invited_by VARCHAR(36),
+                        invitation_accepted_at TIMESTAMP WITH TIME ZONE,
+                        permissions JSON,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE
+                    )
+                """))
+                migrations.append("✅ Tabla account_users creada")
+            except Exception as e:
+                migrations.append(f"⚠️ Tabla account_users: {str(e)[:50]}")
+            
+            conn.commit()
+            
+            # Crear cuenta sistema si no existe
+            try:
+                result = conn.execute(text("SELECT COUNT(*) FROM accounts WHERE slug = 'sistema'")).scalar()
+                if result == 0:
+                    conn.execute(text("""
+                        INSERT INTO accounts (name, slug, description, max_apartments, is_active)
+                        VALUES ('Sistema', 'sistema', 'Cuenta por defecto para apartamentos demo', 1000, true)
+                    """))
+                    migrations.append("✅ Cuenta 'Sistema' creada")
+                else:
+                    migrations.append("✅ Cuenta 'Sistema' ya existe")
+                
+                # Asignar apartamentos sin cuenta
+                account_id = conn.execute(text("SELECT id FROM accounts WHERE slug = 'sistema'")).scalar()
+                result = conn.execute(text("""
+                    UPDATE apartments 
+                    SET account_id = :account_id 
+                    WHERE account_id IS NULL
+                """), {"account_id": account_id})
+                
+                migrations.append(f"✅ {result.rowcount} apartamentos asignados a cuenta sistema")
+                
+                conn.commit()
+                
+            except Exception as e:
+                migrations.append(f"⚠️ Error creando cuenta sistema: {str(e)[:50]}")
+        
+        return {
+            "success": True,
+            "message": "✅ Migración de Render completada",
+            "migrations": migrations,
+            "next_step": "El sistema multiusuario está listo"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "❌ Error en migración de Render"
+        }
+
 @app.get("/migrate/status")
 def get_migration_status():
     """Obtener estado de la migración multiusuario"""
