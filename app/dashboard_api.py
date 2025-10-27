@@ -285,9 +285,11 @@ def dashboard_data(
 
 @router.get("/apartments")
 def get_apartments(db: Session = Depends(get_db)):
-    """Get list of apartments for filter dropdown"""
+    """Get list of apartments for filter dropdown - LEGACY VERSION (shows all apartments)"""
+    # NOTA: Este endpoint legacy muestra todos los apartamentos
+    # Para el sistema multiusuario, usar /api/v1/apartments/ con autenticación
     apartments = db.query(models.Apartment).filter(models.Apartment.is_active == True).all()
-    return [{"code": apt.code, "name": apt.name or apt.code} for apt in apartments]
+    return [{"code": apt.code, "name": apt.name or apt.code, "account_id": apt.account_id} for apt in apartments]
 
 @router.get("/recent-expenses")
 def get_recent_expenses(

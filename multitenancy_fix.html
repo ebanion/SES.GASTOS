@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Reparación de Multitenancy - SES.GASTOS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px; margin: 0 auto;
+            background: white; border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 30px; text-align: center;
+        }
+        
+        .content { padding: 30px; }
+        
+        .section {
+            margin: 30px 0; padding: 20px;
+            border: 1px solid #e1e5e9; border-radius: 12px;
+        }
+        
+        .success { background: #f0f9ff; border-color: #0ea5e9; }
+        .error { background: #fef2f2; border-color: #ef4444; }
+        .warning { background: #fffbeb; border-color: #f59e0b; }
+        .info { background: #f8fafc; border-color: #64748b; }
+        
+        .btn {
+            display: inline-block; padding: 12px 24px; margin: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; text-decoration: none; border: none;
+            border-radius: 8px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: transform 0.2s;
+        }
+        
+        .btn:hover { transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
+        .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        
+        pre {
+            background: #f8fafc; padding: 15px; border-radius: 8px;
+            overflow-x: auto; font-size: 14px; border: 1px solid #e2e8f0;
+        }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        
+        .card {
+            background: white; padding: 20px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;
+        }
+        
+        .status-indicator {
+            display: inline-block; width: 12px; height: 12px;
+            border-radius: 50%; margin-right: 8px;
+        }
+        
+        .status-ok { background: #10b981; }
+        .status-warning { background: #f59e0b; }
+        .status-error { background: #ef4444; }
+        
+        .loading {
+            display: inline-block; width: 20px; height: 20px;
+            border: 3px solid #f3f3f3; border-top: 3px solid #667eea;
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Reparación de Multitenancy</h1>
+            <p>Diagnóstico y solución de problemas de aislamiento de datos</p>
+        </div>
+        
+        <div class="content">
+            <!-- Estado del Sistema -->
+            <div class="section info">
+                <h2>📊 Estado del Sistema</h2>
+                <div id="systemStatus">
+                    <div class="loading"></div> Cargando diagnóstico...
+                </div>
+            </div>
+            
+            <!-- Acciones -->
+            <div class="section">
+                <h2>🛠️ Acciones Disponibles</h2>
+                <div style="text-align: center;">
+                    <button class="btn" onclick="runDiagnosis()">🔍 Ejecutar Diagnóstico</button>
+                    <button class="btn btn-warning" onclick="fixMultitenancy()" id="fixBtn" disabled>
+                        🔧 Arreglar Multitenancy
+                    </button>
+                    <button class="btn btn-success" onclick="testLogin()">🔑 Test Login</button>
+                    <button class="btn" onclick="testDashboard()">📊 Test Dashboard</button>
+                </div>
+            </div>
+            
+            <!-- Resultados del Diagnóstico -->
+            <div id="diagnosisResults" class="hidden">
+                <div class="section">
+                    <h2>🔍 Resultados del Diagnóstico</h2>
+                    <div id="diagnosisContent"></div>
+                </div>
+            </div>
+            
+            <!-- Log de Actividades -->
+            <div class="section">
+                <h2>📝 Log de Actividades</h2>
+                <div id="activityLog" style="max-height: 400px; overflow-y: auto;">
+                    <p style="color: #64748b;">Ejecuta una acción para ver los logs...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let diagnosisData = null;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('activityLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: '#64748b',
+                success: '#10b981', 
+                error: '#ef4444',
+                warning: '#f59e0b'
+            };
+            
+            const entry = document.createElement('div');
+            entry.style.marginBottom = '8px';
+            entry.style.padding = '8px 12px';
+            entry.style.borderRadius = '6px';
+            entry.style.backgroundColor = type === 'error' ? '#fef2f2' : type === 'success' ? '#f0fdf4' : type === 'warning' ? '#fffbeb' : '#f8fafc';
+            entry.style.borderLeft = `4px solid ${colors[type]}`;
+            entry.innerHTML = `<span style="color: #64748b; font-size: 12px;">[${timestamp}]</span> <span style="color: ${colors[type]};">${message}</span>`;
+            
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        async function runDiagnosis() {
+            log('🔍 Ejecutando diagnóstico de multitenancy...', 'info');
+            
+            try {
+                const response = await fetch('/debug/multitenancy');
+                const data = await response.json();
+                
+                if (data.success) {
+                    diagnosisData = data;
+                    displayDiagnosis(data);
+                    log(`✅ Diagnóstico completado: ${data.summary.problems_count} problemas encontrados`, 'success');
+                    
+                    // Habilitar botón de reparación si hay problemas
+                    const fixBtn = document.getElementById('fixBtn');
+                    if (data.summary.problems_count > 0) {
+                        fixBtn.disabled = false;
+                        fixBtn.textContent = `🔧 Arreglar ${data.summary.problems_count} Problemas`;
+                    } else {
+                        fixBtn.disabled = true;
+                        fixBtn.textContent = '✅ No hay problemas';
+                    }
+                } else {
+                    log(`❌ Error en diagnóstico: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+        
+        function displayDiagnosis(data) {
+            const resultsDiv = document.getElementById('diagnosisResults');
+            const contentDiv = document.getElementById('diagnosisContent');
+            
+            let html = '<div class="grid">';
+            
+            // Resumen
+            html += `
+                <div class="card">
+                    <h3>📊 Resumen</h3>
+                    <p><strong>Cuentas:</strong> ${data.summary.total_accounts}</p>
+                    <p><strong>Usuarios:</strong> ${data.summary.total_users}</p>
+                    <p><strong>Apartamentos Legacy:</strong> ${data.summary.total_legacy_apartments}</p>
+                    <p><strong>Problemas:</strong> <span style="color: ${data.summary.problems_count > 0 ? '#ef4444' : '#10b981'};">${data.summary.problems_count}</span></p>
+                </div>
+            `;
+            
+            // Cuentas
+            html += '<div class="card"><h3>🏢 Cuentas</h3>';
+            data.accounts.forEach(account => {
+                const statusColor = account.is_active ? '#10b981' : '#ef4444';
+                html += `
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                        <div><strong>${account.name}</strong> <span style="color: ${statusColor};">●</span></div>
+                        <div style="font-size: 14px; color: #64748b;">@${account.slug} • ${account.contact_email}</div>
+                        <div style="font-size: 14px; color: #64748b;">${account.users_count} usuarios, ${account.apartments_count} apartamentos</div>
+                        ${account.apartments.map(apt => `<div style="margin-left: 20px; font-size: 12px; color: #64748b;">🏠 ${apt.code}: ${apt.name}</div>`).join('')}
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            // Apartamentos Legacy
+            if (data.legacy_apartments.length > 0) {
+                html += '<div class="card"><h3>⚠️ Apartamentos Legacy</h3>';
+                data.legacy_apartments.forEach(apt => {
+                    html += `
+                        <div style="margin: 8px 0; padding: 8px; background: #fffbeb; border-radius: 4px;">
+                            <strong>${apt.code}</strong>: ${apt.name}<br>
+                            <span style="font-size: 14px; color: #64748b;">Owner: ${apt.owner_email || 'Sin email'}</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            
+            // Problemas
+            if (data.problems.length > 0) {
+                html += '<div class="section error"><h3>🚨 Problemas Detectados</h3><ul>';
+                data.problems.forEach(problem => {
+                    html += `<li>${problem}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            contentDiv.innerHTML = html;
+            resultsDiv.classList.remove('hidden');
+        }
+        
+        async function fixMultitenancy() {
+            if (!confirm('¿Estás seguro de que quieres arreglar los problemas de multitenancy? Esta acción migrará apartamentos y creará cuentas/usuarios automáticamente.')) {
+                return;
+            }
+            
+            log('🔧 Iniciando reparación de multitenancy...', 'warning');
+            
+            const fixBtn = document.getElementById('fixBtn');
+            fixBtn.disabled = true;
+            fixBtn.innerHTML = '<div class="loading"></div> Reparando...';
+            
+            try {
+                const response = await fetch('/fix-multitenancy', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`✅ Reparación completada: ${data.migrated_apartments} apartamentos migrados`, 'success');
+                    
+                    // Mostrar resultados detallados
+                    data.results.forEach(result => {
+                        log(result, 'success');
+                    });
+                    
+                    // Ejecutar diagnóstico de nuevo
+                    setTimeout(() => {
+                        log('🔄 Ejecutando diagnóstico post-reparación...', 'info');
+                        runDiagnosis();
+                    }, 2000);
+                    
+                } else {
+                    log(`❌ Error en reparación: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+            } finally {
+                fixBtn.disabled = false;
+                fixBtn.textContent = '🔧 Arreglar Multitenancy';
+            }
+        }
+        
+        async function testLogin() {
+            log('🔑 Probando login con cuenta demo...', 'info');
+            
+            try {
+                const response = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'demo@example.com',
+                        password: '123456'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.setItem('user_data', JSON.stringify(data.user));
+                    localStorage.setItem('accounts_data', JSON.stringify(data.accounts));
+                    if (data.default_account_id) {
+                        localStorage.setItem('current_account_id', data.default_account_id);
+                    }
+                    
+                    log(`✅ Login exitoso: ${data.user.email}`, 'success');
+                    log(`📊 Cuentas disponibles: ${data.accounts.length}`, 'info');
+                    
+                    data.accounts.forEach(account => {
+                        log(`  - ${account.name} (@${account.slug})`, 'info');
+                    });
+                } else {
+                    log(`❌ Login falló: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error en login: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testDashboard() {
+            const token = localStorage.getItem('access_token');
+            const currentAccountId = localStorage.getItem('current_account_id');
+            
+            if (!token) {
+                log('❌ No hay token. Ejecuta login primero.', 'error');
+                return;
+            }
+            
+            log('📊 Probando endpoint de apartamentos...', 'info');
+            
+            try {
+                const response = await fetch('/api/v1/apartments/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-Account-ID': currentAccountId
+                    }
+                });
+                
+                if (response.ok) {
+                    const apartments = await response.json();
+                    log(`✅ Apartamentos cargados: ${apartments.length}`, 'success');
+                    
+                    apartments.forEach(apt => {
+                        log(`  🏠 ${apt.code}: ${apt.name}`, 'info');
+                    });
+                    
+                    if (apartments.length === 0) {
+                        log('ℹ️ No hay apartamentos en esta cuenta. Esto es correcto si es una cuenta nueva.', 'info');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Error cargando apartamentos: ${response.status} ${errorText}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+        
+        // Ejecutar diagnóstico inicial
+        window.addEventListener('load', () => {
+            setTimeout(runDiagnosis, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 # app/main.py
 import os
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 # Importa modelos para que SQLAlchemy “conozca” las tablas
@@ -2176,6 +2176,391 @@ def quick_setup():
             "success": False,
             "error": str(e),
             "message": "Error en configuración rápida"
+        }
+
+@app.get("/debug/dashboard", response_class=HTMLResponse)
+async def debug_dashboard_page():
+    """Página de debugging para el dashboard multiusuario"""
+    try:
+        with open("debug_dashboard.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Debug page not found</h1>", status_code=404)
+
+@app.get("/fix-multitenancy-page", response_class=HTMLResponse)
+async def fix_multitenancy_page():
+    """Página completa para diagnosticar y reparar multitenancy"""
+    try:
+        with open("multitenancy_fix.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Multitenancy fix page not found</h1>", status_code=404)
+
+@app.get("/debug/multitenancy")
+async def debug_multitenancy():
+    """Diagnosticar problemas de multitenancy"""
+    try:
+        from .db import SessionLocal
+        from . import models
+        from sqlalchemy import and_
+        
+        db = SessionLocal()
+        try:
+            # 1. Estructura de cuentas
+            accounts = db.query(models.Account).all()
+            accounts_info = []
+            
+            for account in accounts:
+                users_count = db.query(models.AccountUser).filter(models.AccountUser.account_id == account.id).count()
+                apartments = db.query(models.Apartment).filter(models.Apartment.account_id == account.id).all()
+                
+                accounts_info.append({
+                    "id": account.id,
+                    "name": account.name,
+                    "slug": account.slug,
+                    "contact_email": account.contact_email,
+                    "is_active": account.is_active,
+                    "users_count": users_count,
+                    "apartments_count": len(apartments),
+                    "apartments": [
+                        {
+                            "code": apt.code,
+                            "name": apt.name,
+                            "owner_email": apt.owner_email,
+                            "is_active": apt.is_active
+                        }
+                        for apt in apartments
+                    ]
+                })
+            
+            # 2. Apartamentos legacy (sin cuenta)
+            legacy_apartments = db.query(models.Apartment).filter(models.Apartment.account_id == None).all()
+            legacy_info = [
+                {
+                    "code": apt.code,
+                    "name": apt.name,
+                    "owner_email": apt.owner_email,
+                    "is_active": apt.is_active
+                }
+                for apt in legacy_apartments
+            ]
+            
+            # 3. Usuarios y membresías
+            users = db.query(models.User).all()
+            users_info = []
+            
+            for user in users:
+                memberships = db.query(models.AccountUser).filter(models.AccountUser.user_id == user.id).all()
+                user_accounts = []
+                
+                for membership in memberships:
+                    account = db.query(models.Account).filter(models.Account.id == membership.account_id).first()
+                    user_accounts.append({
+                        "account_name": account.name if account else "Cuenta eliminada",
+                        "account_slug": account.slug if account else None,
+                        "role": membership.role,
+                        "is_active": membership.is_active
+                    })
+                
+                users_info.append({
+                    "id": user.id,
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "is_superadmin": user.is_superadmin,
+                    "is_active": user.is_active,
+                    "accounts": user_accounts
+                })
+            
+            # 4. Detectar problemas
+            problems = []
+            
+            if legacy_apartments:
+                problems.append(f"❌ {len(legacy_apartments)} apartamentos sin cuenta (legacy)")
+            
+            # Verificar apartamentos con owner_email que no coincide
+            for account_info in accounts_info:
+                for apt in account_info["apartments"]:
+                    if apt["owner_email"] and apt["owner_email"] != account_info["contact_email"]:
+                        problems.append(f"⚠️ Apartamento {apt['code']}: email owner ({apt['owner_email']}) ≠ email cuenta ({account_info['contact_email']})")
+            
+            # Verificar cuentas sin usuarios
+            for account_info in accounts_info:
+                if account_info["users_count"] == 0:
+                    problems.append(f"⚠️ Cuenta '{account_info['name']}' sin usuarios")
+            
+            return {
+                "success": True,
+                "accounts": accounts_info,
+                "legacy_apartments": legacy_info,
+                "users": users_info,
+                "problems": problems,
+                "summary": {
+                    "total_accounts": len(accounts),
+                    "total_legacy_apartments": len(legacy_apartments),
+                    "total_users": len(users),
+                    "problems_count": len(problems)
+                }
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/fix-multitenancy")
+async def fix_multitenancy():
+    """Arreglar problemas de multitenancy automáticamente"""
+    try:
+        from .db import SessionLocal
+        from . import models
+        from .auth_multiuser import create_account_slug, ensure_unique_slug, get_password_hash
+        from datetime import datetime, timezone
+        
+        db = SessionLocal()
+        try:
+            results = []
+            
+            # 1. Migrar apartamentos legacy
+            legacy_apartments = db.query(models.Apartment).filter(models.Apartment.account_id == None).all()
+            
+            for apt in legacy_apartments:
+                if apt.owner_email:
+                    # Buscar o crear cuenta para este email
+                    account = db.query(models.Account).filter(models.Account.contact_email == apt.owner_email).first()
+                    
+                    if not account:
+                        # Crear cuenta nueva
+                        account_name = f"Cuenta de {apt.owner_email.split('@')[0].title()}"
+                        base_slug = create_account_slug(account_name)
+                        unique_slug = ensure_unique_slug(db, base_slug)
+                        
+                        account = models.Account(
+                            name=account_name,
+                            slug=unique_slug,
+                            contact_email=apt.owner_email,
+                            max_apartments=50,
+                            is_active=True
+                        )
+                        db.add(account)
+                        db.flush()
+                        
+                        results.append(f"✅ Cuenta creada: {account.name} (@{account.slug})")
+                        
+                        # Buscar o crear usuario
+                        user = db.query(models.User).filter(models.User.email == apt.owner_email).first()
+                        if not user:
+                            user = models.User(
+                                email=apt.owner_email,
+                                full_name=f"Usuario {apt.owner_email.split('@')[0].title()}",
+                                password_hash=get_password_hash("123456"),  # Contraseña temporal
+                                is_active=True
+                            )
+                            db.add(user)
+                            db.flush()
+                            
+                            results.append(f"✅ Usuario creado: {user.email} (contraseña: 123456)")
+                        
+                        # Crear membresía
+                        membership = models.AccountUser(
+                            account_id=account.id,
+                            user_id=user.id,
+                            role="owner",
+                            invitation_accepted_at=datetime.now(timezone.utc)
+                        )
+                        db.add(membership)
+                        
+                        results.append(f"✅ Membresía creada: {user.email} → {account.name}")
+                    
+                    # Migrar apartamento a la cuenta
+                    apt.account_id = account.id
+                    results.append(f"🏠 Apartamento migrado: {apt.code} → {account.name}")
+                else:
+                    # Apartamento sin owner_email, mover a cuenta sistema
+                    sistema_account = db.query(models.Account).filter(models.Account.slug == "sistema").first()
+                    if not sistema_account:
+                        sistema_account = models.Account(
+                            name="Sistema",
+                            slug="sistema",
+                            contact_email="admin@sesgas.com",
+                            description="Cuenta del sistema para apartamentos legacy",
+                            max_apartments=1000,
+                            is_active=True
+                        )
+                        db.add(sistema_account)
+                        db.flush()
+                        results.append("✅ Cuenta sistema creada")
+                    
+                    apt.account_id = sistema_account.id
+                    results.append(f"🏠 Apartamento sin owner migrado a sistema: {apt.code}")
+            
+            db.commit()
+            
+            return {
+                "success": True,
+                "message": "✅ Multitenancy arreglado exitosamente",
+                "results": results,
+                "migrated_apartments": len(legacy_apartments)
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "❌ Error arreglando multitenancy"
+        }
+
+@app.post("/fix-apartment-accounts")
+async def fix_apartment_accounts():
+    """Migrar apartamentos legacy a cuentas de usuario correctas"""
+    try:
+        from .db import SessionLocal
+        from . import models
+        
+        db = SessionLocal()
+        try:
+            # Obtener apartamentos problemáticos
+            legacy_apartments = db.query(models.Apartment).filter(
+                models.Apartment.account_id == None
+            ).all()
+            
+            sistema_account = db.query(models.Account).filter(models.Account.slug == "sistema").first()
+            sistema_apartments = []
+            if sistema_account:
+                sistema_apartments = db.query(models.Apartment).filter(
+                    models.Apartment.account_id == sistema_account.id
+                ).all()
+            
+            all_problematic = legacy_apartments + sistema_apartments
+            
+            # Obtener cuentas de usuario reales
+            user_accounts = db.query(models.Account).filter(
+                models.Account.slug != "sistema"
+            ).all()
+            
+            migration_results = []
+            migrated_count = 0
+            
+            # Ejecutar migración automática por email
+            for apt in all_problematic:
+                if apt.owner_email:
+                    # Buscar cuenta que coincida con el email
+                    matching_account = None
+                    for account in user_accounts:
+                        if account.contact_email == apt.owner_email:
+                            matching_account = account
+                            break
+                    
+                    if matching_account:
+                        old_account_id = apt.account_id
+                        apt.account_id = matching_account.id
+                        
+                        migration_results.append({
+                            "apartment_code": apt.code,
+                            "apartment_name": apt.name,
+                            "from_account": "sistema" if old_account_id == sistema_account.id else "legacy",
+                            "to_account": matching_account.name,
+                            "owner_email": apt.owner_email,
+                            "status": "migrated"
+                        })
+                        migrated_count += 1
+                    else:
+                        migration_results.append({
+                            "apartment_code": apt.code,
+                            "apartment_name": apt.name,
+                            "owner_email": apt.owner_email,
+                            "status": "no_matching_account"
+                        })
+            
+            if migrated_count > 0:
+                db.commit()
+            
+            return {
+                "success": True,
+                "migrated_count": migrated_count,
+                "total_problematic": len(all_problematic),
+                "migration_results": migration_results,
+                "message": f"✅ {migrated_count} apartamentos migrados exitosamente" if migrated_count > 0 else "ℹ️ No hay apartamentos para migrar"
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "❌ Error en migración de apartamentos"
+        }
+
+@app.get("/debug/multiuser-apartments")
+async def debug_multiuser_apartments():
+    """Debug endpoint para apartamentos multiusuario"""
+    try:
+        from .db import SessionLocal
+        from . import models
+        
+        db = SessionLocal()
+        try:
+            # Obtener todas las cuentas
+            accounts = db.query(models.Account).all()
+            accounts_info = []
+            
+            for account in accounts:
+                apartments = db.query(models.Apartment).filter(
+                    models.Apartment.account_id == account.id
+                ).all()
+                
+                accounts_info.append({
+                    "account_id": account.id,
+                    "account_name": account.name,
+                    "account_slug": account.slug,
+                    "apartments_count": len(apartments),
+                    "apartments": [
+                        {
+                            "id": apt.id,
+                            "code": apt.code,
+                            "name": apt.name,
+                            "account_id": apt.account_id
+                        }
+                        for apt in apartments
+                    ]
+                })
+            
+            # Apartamentos sin cuenta (legacy)
+            legacy_apartments = db.query(models.Apartment).filter(
+                models.Apartment.account_id == None
+            ).all()
+            
+            return {
+                "success": True,
+                "accounts": accounts_info,
+                "legacy_apartments": [
+                    {
+                        "id": apt.id,
+                        "code": apt.code,
+                        "name": apt.name,
+                        "account_id": apt.account_id
+                    }
+                    for apt in legacy_apartments
+                ],
+                "total_accounts": len(accounts),
+                "total_legacy_apartments": len(legacy_apartments)
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
         }
 
 @app.get("/bot/diagnose")
