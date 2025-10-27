@@ -284,7 +284,7 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-class UserOut(UserBase):
+class UserOutLegacy(UserBase):
     id: str
     is_active: bool
     is_admin: bool
