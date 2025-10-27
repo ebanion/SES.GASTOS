@@ -426,6 +426,54 @@ def test_register():
             "message": "Error creando usuario test"
         }
 
+@app.get("/postgres-debug")
+def postgres_debug():
+    """Diagnosticar problema de PostgreSQL"""
+    import os
+    
+    # Obtener todas las variables de PostgreSQL
+    env_vars = {}
+    for key in os.environ:
+        if any(word in key.upper() for word in ['DATABASE', 'POSTGRES', 'DB']):
+            # Enmascarar contraseñas
+            value = os.environ[key]
+            if '://' in value and '@' in value:
+                # Es una URL de conexión, enmascarar contraseña
+                parts = value.split('@')
+                if len(parts) > 1:
+                    user_pass = parts[0].split('://')[-1]
+                    if ':' in user_pass:
+                        user, password = user_pass.split(':', 1)
+                        masked_value = value.replace(f":{password}@", ":***@")
+                        env_vars[key] = masked_value
+                    else:
+                        env_vars[key] = value
+                else:
+                    env_vars[key] = value
+            else:
+                env_vars[key] = value[:10] + "***" if len(value) > 10 else value
+    
+    # Intentar diferentes URLs de PostgreSQL
+    test_results = {}
+    
+    for var_name, url in env_vars.items():
+        if '://' in str(url) and 'postgresql' in str(url).lower():
+            try:
+                from sqlalchemy import create_engine, text
+                test_engine = create_engine(url, pool_pre_ping=True)
+                with test_engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                test_results[var_name] = "✅ FUNCIONA"
+            except Exception as e:
+                test_results[var_name] = f"❌ {str(e)[:100]}"
+    
+    return {
+        "environment_variables": env_vars,
+        "connection_tests": test_results,
+        "current_database": "sqlite" if "sqlite" in str(os.getenv("DATABASE_URL", "")) else "postgresql",
+        "recommendation": "Verificar credenciales de PostgreSQL en Render dashboard"
+    }
+
 @app.get("/system-status")
 def system_status():
     """Diagnóstico completo del sistema"""
