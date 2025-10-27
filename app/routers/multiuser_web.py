@@ -28,6 +28,18 @@ async def register_page(request: Request):
     """Página de registro de anfitrión"""
     return templates.TemplateResponse("multiuser_register.html", {"request": request})
 
+# ---------- ONBOARDING ----------
+
+@router.get("/onboarding/apartment", response_class=HTMLResponse)
+async def onboarding_apartment_page(request: Request):
+    """Paso 2: Configuración del primer apartamento"""
+    return templates.TemplateResponse("onboarding_apartment.html", {"request": request})
+
+@router.get("/onboarding/telegram", response_class=HTMLResponse)
+async def onboarding_telegram_page(request: Request):
+    """Paso 3: Activación del bot de Telegram"""
+    return templates.TemplateResponse("onboarding_telegram.html", {"request": request})
+
 @router.get("/test", response_class=HTMLResponse)
 async def test_page(request: Request):
     """Página de prueba simple"""
@@ -88,12 +100,242 @@ async def account_selector_page(request: Request):
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     """Dashboard principal de la cuenta seleccionada"""
-    # Por ahora redirigir al dashboard existente
-    # TODO: Crear dashboard específico multiusuario
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "multiuser": True
-    })
+    return HTMLResponse("""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Dashboard - SES.GASTOS</title>
+        <style>
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                margin: 0; padding: 20px; background: #f5f5f5; min-height: 100vh;
+            }
+            .container { max-width: 1200px; margin: 0 auto; }
+            .header { 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px;
+                display: flex; justify-content: space-between; align-items: center;
+            }
+            .account-info { display: flex; align-items: center; }
+            .account-icon { 
+                width: 48px; height: 48px; background: rgba(255,255,255,0.2);
+                border-radius: 12px; display: flex; align-items: center; justify-content: center;
+                font-size: 24px; margin-right: 16px;
+            }
+            .btn { 
+                padding: 8px 16px; background: rgba(255,255,255,0.2); color: white;
+                border: none; border-radius: 6px; cursor: pointer; text-decoration: none;
+                display: inline-block; margin-left: 8px;
+            }
+            .btn:hover { background: rgba(255,255,255,0.3); }
+            .welcome-message {
+                background: white; padding: 32px; border-radius: 12px; text-align: center;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px;
+            }
+            .no-apartments {
+                background: #fff8e1; border: 1px solid #ffcc02; border-radius: 8px;
+                padding: 24px; text-align: center; margin: 20px 0;
+            }
+            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+            .card { 
+                background: white; padding: 20px; border-radius: 12px; 
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            .loading { text-align: center; padding: 40px; color: #666; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <div class="account-info">
+                    <div class="account-icon" id="accountIcon">🏠</div>
+                    <div>
+                        <h1 id="accountName">Cargando...</h1>
+                        <p id="userEmail">-</p>
+                    </div>
+                </div>
+                <div>
+                    <a href="/multiuser/account-selector" class="btn">Cambiar Cuenta</a>
+                    <button onclick="logout()" class="btn">Cerrar Sesión</button>
+                </div>
+            </div>
+
+            <div id="dashboardContent" class="loading">
+                <p>Cargando dashboard...</p>
+            </div>
+        </div>
+
+        <script>
+            let userData = null;
+            let accountsData = null;
+            let currentAccountId = null;
+
+            async function loadUserData() {
+                const token = localStorage.getItem('access_token');
+                if (!token) {
+                    window.location.href = '/multiuser/login';
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/v1/auth/me', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        userData = data.user;
+                        accountsData = data.accounts;
+                        currentAccountId = localStorage.getItem('current_account_id') || data.default_account_id;
+
+                        displayUserInfo();
+                        await loadApartments();
+                    } else {
+                        window.location.href = '/multiuser/login';
+                    }
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                    window.location.href = '/multiuser/login';
+                }
+            }
+
+            function displayUserInfo() {
+                const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
+                
+                document.getElementById('accountName').textContent = currentAccount?.name || 'Cuenta';
+                document.getElementById('userEmail').textContent = userData.email;
+                document.getElementById('accountIcon').textContent = currentAccount?.name.charAt(0) || '🏠';
+            }
+
+            async function loadApartments() {
+                const token = localStorage.getItem('access_token');
+                
+                try {
+                    const response = await fetch('/api/v1/apartments/', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'X-Account-ID': currentAccountId
+                        }
+                    });
+
+                    if (response.ok) {
+                        const apartments = await response.json();
+                        displayDashboard(apartments);
+                    } else {
+                        displayNoApartments();
+                    }
+                } catch (error) {
+                    console.error('Error loading apartments:', error);
+                    displayNoApartments();
+                }
+            }
+
+            function displayNoApartments() {
+                document.getElementById('dashboardContent').innerHTML = `
+                    <div class="no-apartments">
+                        <h2>🏠 ¡Vamos a configurar tu primer apartamento!</h2>
+                        <p>Para empezar a gestionar gastos e ingresos, necesitas configurar al menos un apartamento.</p>
+                        <br>
+                        <button class="btn" onclick="window.location.href='/multiuser/onboarding/apartment'" 
+                                style="background: #667eea; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
+                            ➕ Configurar mi primer apartamento
+                        </button>
+                    </div>
+                `;
+            }
+
+            function displayDashboard(apartments) {
+                const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
+                
+                document.getElementById('dashboardContent').innerHTML = `
+                    <div class="welcome-message">
+                        <h2>🎉 ¡Bienvenido a tu Dashboard!</h2>
+                        <p>Tienes <strong>${apartments.length} apartamento(s)</strong> configurado(s) en <strong>${currentAccount?.name}</strong></p>
+                    </div>
+
+                    <div class="grid">
+                        <div class="card">
+                            <h3>🏠 Mis Apartamentos</h3>
+                            <div id="apartmentsList">
+                                ${apartments.map(apt => `
+                                    <div style="padding: 8px; border-bottom: 1px solid #eee;">
+                                        <strong>${apt.code}</strong> - ${apt.name || 'Sin nombre'}
+                                        <span style="color: ${apt.is_active ? '#4caf50' : '#f44336'};">
+                                            ${apt.is_active ? '✅ Activo' : '⏸️ Inactivo'}
+                                        </span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <br>
+                            <button class="btn" onclick="window.location.href='/multiuser/onboarding/apartment'" 
+                                    style="background: #667eea; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;">
+                                ➕ Agregar apartamento
+                            </button>
+                        </div>
+
+                        <div class="card">
+                            <h3>🤖 Bot de Telegram</h3>
+                            <p>Envía fotos de facturas y se procesarán automáticamente</p>
+                            <br>
+                            <a href="https://t.me/UriApartment_Bot" target="_blank" class="btn" 
+                               style="background: #0088cc; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">
+                                Abrir Bot
+                            </a>
+                            <button onclick="showBotInstructions()" class="btn" 
+                                    style="background: #f8f9fa; color: #333; padding: 8px 16px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer;">
+                                Ver instrucciones
+                            </button>
+                        </div>
+
+                        <div class="card">
+                            <h3>📊 Resumen Financiero</h3>
+                            <p>Gastos e ingresos de este mes</p>
+                            <div style="margin-top: 16px;">
+                                <div>💰 Ingresos: <strong>0 €</strong></div>
+                                <div>💸 Gastos: <strong>0 €</strong></div>
+                                <div>📈 Balance: <strong>0 €</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 32px; padding: 20px; background: white; border-radius: 8px;">
+                        <h3>🚀 ¡Tu sistema está listo!</h3>
+                        <p>Ahora puedes:</p>
+                        <ul style="text-align: left; max-width: 400px; margin: 16px auto;">
+                            <li>📸 Enviar fotos de facturas al bot</li>
+                            <li>💰 Registrar gastos automáticamente</li>
+                            <li>📊 Ver reportes en tiempo real</li>
+                            <li>🏠 Gestionar múltiples apartamentos</li>
+                        </ul>
+                    </div>
+                `;
+            }
+
+            function showBotInstructions() {
+                const apartmentCode = apartments.length > 0 ? apartments[0].code : 'TU_CODIGO';
+                alert(`🤖 Instrucciones del Bot:
+
+1. Abre Telegram y busca: @UriApartment_Bot
+2. Envía: /start
+3. Envía: /usar ${apartmentCode}
+4. ¡Envía una foto de factura!
+
+El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`);
+            }
+
+            function logout() {
+                localStorage.clear();
+                window.location.href = '/multiuser/login';
+            }
+
+            // Inicializar
+            loadUserData();
+        </script>
+    </body>
+    </html>
+    """)
 
 # ---------- GESTIÓN DE CUENTAS ----------
 

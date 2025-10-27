@@ -178,16 +178,17 @@
 <body>
     <div class="register-container">
         <div class="logo">🏠 SES.GASTOS</div>
-        <div class="subtitle">Registro de Nueva Cuenta de Anfitrión</div>
+        <div class="subtitle">Empieza gratis • Crea tu cuenta</div>
 
         <div class="info-box">
-            <h3>🎯 ¿Qué obtienes al registrarte?</h3>
+            <h3>🚀 Vamos a poner en marcha tu panel</h3>
+            <p style="margin-bottom: 12px;"><strong>En menos de 2 minutos tendrás tu primer apartamento automatizado.</strong></p>
             <ul>
-                <li>Tu propia cuenta independiente</li>
-                <li>Gestión de múltiples apartamentos</li>
-                <li>Bot de Telegram con IA para gastos</li>
-                <li>Dashboard financiero completo</li>
-                <li>30 días de prueba gratuita</li>
+                <li>🤖 Bot de Telegram que procesa facturas con IA</li>
+                <li>📊 Dashboard financiero en tiempo real</li>
+                <li>🏠 Gestión ilimitada de apartamentos</li>
+                <li>📱 Acceso desde móvil y web</li>
+                <li>✨ 30 días completamente gratis</li>
             </ul>
         </div>
 
@@ -294,9 +295,9 @@
 
                     showMessage(`¡Cuenta creada exitosamente! Bienvenido ${data.full_name}`, 'success');
                     
-                    // Redirigir al dashboard después de un momento
+                    // Redirigir al onboarding para configurar primer apartamento
                     setTimeout(() => {
-                        window.location.href = '/multiuser/dashboard';
+                        window.location.href = '/multiuser/onboarding/apartment';
                     }, 2000);
 
                 } else {
