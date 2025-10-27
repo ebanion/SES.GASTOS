@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Debug Multitenancy - SES.GASTOS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container {
+            max-width: 1000px; margin: 0 auto;
+            background: white; border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 30px;
+        }
+        .header {
+            text-align: center; margin-bottom: 30px;
+            color: #667eea; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px;
+        }
+        .section {
+            margin: 20px 0; padding: 20px;
+            border: 1px solid #e2e8f0; border-radius: 8px;
+        }
+        .success { background: #f0fdf4; border-color: #10b981; }
+        .error { background: #fef2f2; border-color: #ef4444; }
+        .warning { background: #fffbeb; border-color: #f59e0b; }
+        .info { background: #f8fafc; border-color: #64748b; }
+        .btn {
+            display: inline-block; padding: 10px 20px; margin: 5px;
+            background: #667eea; color: white; text-decoration: none;
+            border: none; border-radius: 6px; cursor: pointer;
+        }
+        .btn:hover { background: #5a67d8; }
+        .btn-danger { background: #ef4444; }
+        .btn-success { background: #10b981; }
+        pre {
+            background: #f8fafc; padding: 15px; border-radius: 6px;
+            overflow-x: auto; font-size: 14px;
+        }
+        .loading {
+            display: inline-block; width: 20px; height: 20px;
+            border: 3px solid #f3f3f3; border-top: 3px solid #667eea;
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Debug Multitenancy</h1>
+            <p>Diagnóstico y reparación del aislamiento de datos</p>
+        </div>
+
+        <div class="section info">
+            <h3>📊 Estado del Sistema</h3>
+            <div id="systemStatus">
+                <div class="loading"></div> Cargando diagnóstico...
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🛠️ Acciones</h3>
+            <button class="btn" onclick="runDiagnosis()">🔍 Ejecutar Diagnóstico</button>
+            <button class="btn btn-danger" onclick="fixMultitenancy()" id="fixBtn" disabled>🔧 Arreglar Problemas</button>
+            <button class="btn btn-success" onclick="testLogin()">🔑 Test Login</button>
+            <button class="btn" onclick="testApartments()">🏠 Test Apartamentos</button>
+        </div>
+
+        <div class="section">
+            <h3>📝 Resultados</h3>
+            <div id="results" style="max-height: 400px; overflow-y: auto;">
+                <p style="color: #64748b;">Ejecuta una acción para ver los resultados...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const colors = { info: '#64748b', success: '#10b981', error: '#ef4444', warning: '#f59e0b' };
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const entry = document.createElement('div');
+            entry.style.marginBottom = '8px';
+            entry.style.padding = '8px 12px';
+            entry.style.borderRadius = '4px';
+            entry.style.backgroundColor = type === 'error' ? '#fef2f2' : type === 'success' ? '#f0fdf4' : '#f8fafc';
+            entry.style.borderLeft = `3px solid ${colors[type]}`;
+            entry.innerHTML = `<span style="color: #64748b; font-size: 12px;">[${timestamp}]</span> <span style="color: ${colors[type]};">${message}</span>`;
+            
+            results.appendChild(entry);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        async function runDiagnosis() {
+            log('🔍 Ejecutando diagnóstico...', 'info');
+            try {
+                const response = await fetch('/debug/multitenancy');
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`✅ Diagnóstico completado`, 'success');
+                    log(`📊 Cuentas: ${data.summary.total_accounts}`, 'info');
+                    log(`👥 Usuarios: ${data.summary.total_users}`, 'info');
+                    log(`🏠 Apartamentos legacy: ${data.summary.total_legacy_apartments}`, 'warning');
+                    log(`🚨 Problemas: ${data.summary.problems_count}`, data.summary.problems_count > 0 ? 'error' : 'success');
+                    
+                    if (data.problems.length > 0) {
+                        data.problems.forEach(problem => log(problem, 'error'));
+                        document.getElementById('fixBtn').disabled = false;
+                    }
+                } else {
+                    log(`❌ Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+
+        async function fixMultitenancy() {
+            if (!confirm('¿Arreglar problemas de multitenancy automáticamente?')) return;
+            
+            log('🔧 Iniciando reparación...', 'warning');
+            try {
+                const response = await fetch('/fix-multitenancy', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`✅ Reparación exitosa: ${data.migrated_apartments} apartamentos migrados`, 'success');
+                    data.results.forEach(result => log(result, 'success'));
+                    setTimeout(runDiagnosis, 2000);
+                } else {
+                    log(`❌ Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLogin() {
+            log('🔑 Probando login...', 'info');
+            try {
+                const response = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'demo@example.com', password: '123456' })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.setItem('current_account_id', data.default_account_id);
+                    log(`✅ Login exitoso: ${data.user.email}`, 'success');
+                    log(`📊 Cuentas: ${data.accounts.length}`, 'info');
+                } else {
+                    log(`❌ Login falló: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testApartments() {
+            const token = localStorage.getItem('access_token');
+            const accountId = localStorage.getItem('current_account_id');
+            
+            if (!token) {
+                log('❌ No hay token. Ejecuta login primero.', 'error');
+                return;
+            }
+            
+            log('🏠 Probando apartamentos...', 'info');
+            try {
+                const response = await fetch('/api/v1/apartments/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-Account-ID': accountId
+                    }
+                });
+                
+                if (response.ok) {
+                    const apartments = await response.json();
+                    log(`✅ Apartamentos: ${apartments.length}`, 'success');
+                    apartments.forEach(apt => log(`  🏠 ${apt.code}: ${apt.name}`, 'info'));
+                } else {
+                    log(`❌ Error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-ejecutar diagnóstico
+        window.addEventListener('load', () => setTimeout(runDiagnosis, 1000));
+    </script>
+</body>
+</html>

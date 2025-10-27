@@ -2178,6 +2178,175 @@ def quick_setup():
             "message": "Error en configuración rápida"
         }
 
+@app.get("/debug/multitenancy-page", response_class=HTMLResponse)
+async def debug_multitenancy_page():
+    """Página de debugging para multitenancy"""
+    try:
+        with open("debug_multitenancy.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Debug multitenancy page not found</h1>", status_code=404)
+
+@app.get("/debug/multitenancy")
+async def debug_multitenancy():
+    """Diagnosticar problemas de multitenancy"""
+    try:
+        from .db import SessionLocal
+        from . import models
+        
+        db = SessionLocal()
+        try:
+            # 1. Estructura de cuentas
+            accounts = db.query(models.Account).all()
+            accounts_info = []
+            
+            for account in accounts:
+                users_count = db.query(models.AccountUser).filter(models.AccountUser.account_id == account.id).count()
+                apartments = db.query(models.Apartment).filter(models.Apartment.account_id == account.id).all()
+                
+                accounts_info.append({
+                    "id": account.id,
+                    "name": account.name,
+                    "slug": account.slug,
+                    "contact_email": account.contact_email,
+                    "is_active": account.is_active,
+                    "users_count": users_count,
+                    "apartments_count": len(apartments),
+                    "apartments": [{"code": apt.code, "name": apt.name, "owner_email": apt.owner_email} for apt in apartments]
+                })
+            
+            # 2. Apartamentos legacy (sin cuenta)
+            legacy_apartments = db.query(models.Apartment).filter(models.Apartment.account_id == None).all()
+            legacy_info = [{"code": apt.code, "name": apt.name, "owner_email": apt.owner_email} for apt in legacy_apartments]
+            
+            # 3. Usuarios
+            users = db.query(models.User).all()
+            users_info = []
+            
+            for user in users:
+                memberships = db.query(models.AccountUser).filter(models.AccountUser.user_id == user.id).all()
+                user_accounts = []
+                
+                for membership in memberships:
+                    account = db.query(models.Account).filter(models.Account.id == membership.account_id).first()
+                    user_accounts.append({
+                        "account_name": account.name if account else "Cuenta eliminada",
+                        "role": membership.role
+                    })
+                
+                users_info.append({
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "is_superadmin": user.is_superadmin,
+                    "accounts": user_accounts
+                })
+            
+            # 4. Detectar problemas
+            problems = []
+            if legacy_apartments:
+                problems.append(f"❌ {len(legacy_apartments)} apartamentos sin cuenta (legacy)")
+            
+            return {
+                "success": True,
+                "accounts": accounts_info,
+                "legacy_apartments": legacy_info,
+                "users": users_info,
+                "problems": problems,
+                "summary": {
+                    "total_accounts": len(accounts),
+                    "total_legacy_apartments": len(legacy_apartments),
+                    "total_users": len(users),
+                    "problems_count": len(problems)
+                }
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/fix-multitenancy")
+async def fix_multitenancy():
+    """Arreglar problemas de multitenancy automáticamente"""
+    try:
+        from .db import SessionLocal
+        from . import models
+        from .auth_multiuser import create_account_slug, ensure_unique_slug, get_password_hash
+        from datetime import datetime, timezone
+        
+        db = SessionLocal()
+        try:
+            results = []
+            
+            # Migrar apartamentos legacy
+            legacy_apartments = db.query(models.Apartment).filter(models.Apartment.account_id == None).all()
+            
+            for apt in legacy_apartments:
+                if apt.owner_email:
+                    # Buscar o crear cuenta para este email
+                    account = db.query(models.Account).filter(models.Account.contact_email == apt.owner_email).first()
+                    
+                    if not account:
+                        # Crear cuenta nueva
+                        account_name = f"Cuenta de {apt.owner_email.split('@')[0].title()}"
+                        base_slug = create_account_slug(account_name)
+                        unique_slug = ensure_unique_slug(db, base_slug)
+                        
+                        account = models.Account(
+                            name=account_name,
+                            slug=unique_slug,
+                            contact_email=apt.owner_email,
+                            max_apartments=50,
+                            is_active=True
+                        )
+                        db.add(account)
+                        db.flush()
+                        
+                        results.append(f"✅ Cuenta creada: {account.name}")
+                        
+                        # Buscar o crear usuario
+                        user = db.query(models.User).filter(models.User.email == apt.owner_email).first()
+                        if not user:
+                            user = models.User(
+                                email=apt.owner_email,
+                                full_name=f"Usuario {apt.owner_email.split('@')[0].title()}",
+                                password_hash=get_password_hash("123456"),
+                                is_active=True
+                            )
+                            db.add(user)
+                            db.flush()
+                            
+                            results.append(f"✅ Usuario creado: {user.email}")
+                        
+                        # Crear membresía
+                        membership = models.AccountUser(
+                            account_id=account.id,
+                            user_id=user.id,
+                            role="owner",
+                            invitation_accepted_at=datetime.now(timezone.utc)
+                        )
+                        db.add(membership)
+                    
+                    # Migrar apartamento
+                    apt.account_id = account.id
+                    results.append(f"🏠 Apartamento migrado: {apt.code} → {account.name}")
+            
+            db.commit()
+            
+            return {
+                "success": True,
+                "message": "✅ Multitenancy arreglado exitosamente",
+                "results": results,
+                "migrated_apartments": len(legacy_apartments)
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.get("/bot/diagnose")
 async def diagnose_bot():
     """Diagnóstico completo del bot de Telegram"""
