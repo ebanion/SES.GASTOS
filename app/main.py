@@ -315,6 +315,51 @@ def on_shutdown() -> None:
 def health():
     return {"ok": True}
 
+@app.post("/test-login")
+def test_login():
+    """Test simple de login"""
+    try:
+        from .auth_multiuser import authenticate_user_by_email, get_user_accounts
+        from .db import SessionLocal
+        
+        # Usar credenciales fijas para test
+        email = "test@example.com"
+        password = "123456"
+        
+        db = SessionLocal()
+        try:
+            # Intentar autenticación
+            from .auth_multiuser import authenticate_user
+            user = authenticate_user(db, email, password)
+            
+            if user:
+                accounts = get_user_accounts(db, user.id)
+                return {
+                    "success": True,
+                    "message": "Login exitoso",
+                    "user": {
+                        "id": user.id,
+                        "email": user.email,
+                        "full_name": user.full_name
+                    },
+                    "accounts_count": len(accounts)
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "Credenciales incorrectas"
+                }
+                
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error en login test"
+        }
+
 @app.post("/test-register")
 def test_register():
     """Test simple de registro sin autenticación"""

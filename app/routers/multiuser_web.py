@@ -59,13 +59,9 @@ async def test_page(request: Request):
         
         async function testLogin() {
             try {
-                const response = await fetch('/api/v1/auth/login', {
+                const response = await fetch('/test-login', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        email: 'test@example.com',
-                        password: '123456'
-                    })
+                    headers: {'Content-Type': 'application/json'}
                 });
                 const data = await response.json();
                 document.getElementById('result').innerHTML = 
