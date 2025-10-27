@@ -25,12 +25,21 @@ class Reservation(Base):
     channel    = Column(String(50))
     email_contact = Column(String(255))
     phone_contact = Column(String(50))
+    guest_name = Column(String(255), nullable=True)
 
-    # Puede ser nulo (no siempre se asigna al crear)
-    apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=True)
+    # VINCULACIÓN CON APARTAMENTO (que ya está vinculado a cuenta)
+    apartment_id = Column(String(36), ForeignKey("apartments.id"), nullable=False)
     
     # Status para el dashboard: PENDING, CONFIRMED, CANCELLED
     status = Column(String(20), nullable=False, default="CONFIRMED")
+    
+    # Datos adicionales
+    booking_reference = Column(String(100), nullable=True)
+    total_amount = Column(Numeric(12, 2), nullable=True)
+    currency = Column(String(3), default="EUR")
+    
+    # Notas internas
+    notes = Column(String(1000), nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),
@@ -38,6 +47,10 @@ class Reservation(Base):
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relaciones
+    apartment = relationship("Apartment", back_populates="reservations")
 
 # ---------- IDEMPOTENCIA ----------
 class IdempotencyKey(Base):
@@ -57,23 +70,47 @@ class Apartment(Base):
     __tablename__ = "apartments"
 
     id   = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    code = Column(String(64), unique=True, nullable=False)
+    code = Column(String(64), nullable=False)  # Único dentro de la cuenta
     name = Column(String(255))
-    owner_email = Column(String(255))
-    is_active   = Column(Boolean, default=True)
+    description = Column(String(500), nullable=True)
     
-    # Relación con usuario
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    # VINCULACIÓN CON CUENTA (TENANT)
+    account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False)
     
-    created_at  = Column(
+    # Datos del apartamento
+    address = Column(String(500), nullable=True)
+    max_guests = Column(Integer, nullable=True)
+    bedrooms = Column(Integer, nullable=True)
+    bathrooms = Column(Integer, nullable=True)
+    
+    # Estado y configuración
+    is_active = Column(Boolean, default=True)
+    
+    # Campos legacy (mantener por compatibilidad)
+    owner_email = Column(String(255), nullable=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)  # Deprecated
+    
+    created_at = Column(
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    # Relaciones
+    account = relationship("Account", back_populates="apartments")
     expenses = relationship("Expense", back_populates="apartment", cascade="all,delete")
-    user = relationship("User", back_populates="apartments")
+    incomes = relationship("Income", back_populates="apartment", cascade="all,delete")
+    reservations = relationship("Reservation", back_populates="apartment", cascade="all,delete")
+    
+    # Legacy relationship (mantener por compatibilidad)
+    user = relationship("User", foreign_keys=[user_id])
+
+    # Constraint único: código único dentro de cada cuenta
+    __table_args__ = (
+        {"extend_existing": True},
+    )
 
 # ---------- GASTOS ----------
 class Expense(Base):
@@ -150,14 +187,55 @@ class Income(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relaciones
-    apartment = relationship("Apartment")
+    apartment = relationship("Apartment", back_populates="incomes")
     reservation = relationship("Reservation")
 
 
-# Código para añadir al final de models.py
+# ---------- CUENTAS DE ANFITRIÓN (TENANTS) ----------
+class Account(Base):
+    """
+    Cuenta de anfitrión/gestor - Tenant principal del sistema SaaS
+    Cada cuenta es completamente independiente
+    """
+    __tablename__ = "accounts"
 
-# ---------- USUARIOS ----------
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(255), nullable=False)  # "Apartamentos Playa S.L."
+    slug = Column(String(100), unique=True, nullable=False)  # "apartamentos-playa"
+    description = Column(String(500), nullable=True)
+    
+    # Configuración de la cuenta
+    is_active = Column(Boolean, default=True)
+    subscription_status = Column(String(20), default="trial")  # trial, active, suspended, cancelled
+    max_apartments = Column(Integer, default=10)  # Límite por plan
+    
+    # Datos de contacto/facturación
+    contact_email = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    address = Column(String(500), nullable=True)
+    tax_id = Column(String(50), nullable=True)  # CIF/NIF
+    
+    # Fechas importantes
+    trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    subscription_ends_at = Column(DateTime(timezone=True), nullable=True)
+    
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relaciones
+    account_users = relationship("AccountUser", back_populates="account", cascade="all,delete")
+    apartments = relationship("Apartment", back_populates="account", cascade="all,delete")
+
+# ---------- USUARIOS DEL SISTEMA ----------
 class User(Base):
+    """
+    Usuario individual - puede pertenecer a múltiples cuentas
+    """
     __tablename__ = "users"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -165,9 +243,15 @@ class User(Base):
     full_name = Column(String(255), nullable=False)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
-    is_admin = Column(Boolean, default=False)
+    
+    # Superadministrador del sistema (tú)
+    is_superadmin = Column(Boolean, default=False)
+    
+    # Datos personales
     phone = Column(String(50), nullable=True)
-    company = Column(String(255), nullable=True)
+    avatar_url = Column(String(500), nullable=True)
+    timezone = Column(String(50), default="Europe/Madrid")
+    language = Column(String(5), default="es")
     
     created_at = Column(
         DateTime(timezone=True),
@@ -178,5 +262,46 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
 
-    # Relación con apartamentos
-    apartments = relationship("Apartment", back_populates="user", cascade="all,delete")
+    # Relaciones
+    account_memberships = relationship("AccountUser", back_populates="user", cascade="all,delete")
+
+# ---------- RELACIÓN USUARIO-CUENTA (MEMBRESÍAS) ----------
+class AccountUser(Base):
+    """
+    Relación muchos-a-muchos entre usuarios y cuentas con roles
+    Un usuario puede estar en varias cuentas, cada una con un rol diferente
+    """
+    __tablename__ = "account_users"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    
+    # Roles dentro de la cuenta
+    role = Column(String(20), nullable=False, default="member")  # owner, admin, member, viewer
+    
+    # Estado de la membresía
+    is_active = Column(Boolean, default=True)
+    invited_by = Column(String(36), ForeignKey("users.id"), nullable=True)
+    invitation_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Permisos específicos (JSON para flexibilidad)
+    permissions = Column(JSON, nullable=True)
+    
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relaciones
+    account = relationship("Account", back_populates="account_users")
+    user = relationship("User", back_populates="account_memberships")
+    invited_by_user = relationship("User", foreign_keys=[invited_by])
+
+    # Constraint único: un usuario solo puede tener un rol por cuenta
+    __table_args__ = (
+        {"extend_existing": True},
+    )

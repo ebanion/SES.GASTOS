@@ -3,8 +3,142 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional, Literal, List
-from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, Literal, List, Dict, Any
+from pydantic import BaseModel, EmailStr, Field, validator
+import re
+
+# ---------- CUENTAS DE ANFITRIÓN ----------
+class AccountCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=255)
+    description: Optional[str] = Field(None, max_length=500)
+    contact_email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    tax_id: Optional[str] = None
+
+    @validator('name')
+    def validate_name(cls, v):
+        if not v.strip():
+            raise ValueError('El nombre de la cuenta no puede estar vacío')
+        return v.strip()
+
+class AccountUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=255)
+    description: Optional[str] = Field(None, max_length=500)
+    contact_email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    tax_id: Optional[str] = None
+    is_active: Optional[bool] = None
+    max_apartments: Optional[int] = Field(None, ge=1, le=1000)
+
+class AccountOut(BaseModel):
+    id: str
+    name: str
+    slug: str
+    description: Optional[str]
+    is_active: bool
+    subscription_status: str
+    max_apartments: int
+    contact_email: Optional[str]
+    phone: Optional[str]
+    address: Optional[str]
+    tax_id: Optional[str]
+    trial_ends_at: Optional[datetime]
+    subscription_ends_at: Optional[datetime]
+    created_at: datetime
+    updated_at: Optional[datetime]
+    
+    # Estadísticas (se calculan dinámicamente)
+    apartments_count: Optional[int] = None
+    users_count: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+# ---------- USUARIOS ----------
+class UserCreate(BaseModel):
+    email: EmailStr
+    full_name: str = Field(..., min_length=2, max_length=255)
+    password: str = Field(..., min_length=6)
+    phone: Optional[str] = None
+    timezone: str = "Europe/Madrid"
+    language: str = "es"
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=2, max_length=255)
+    phone: Optional[str] = None
+    timezone: Optional[str] = None
+    language: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    full_name: str
+    is_active: bool
+    is_superadmin: bool
+    phone: Optional[str]
+    avatar_url: Optional[str]
+    timezone: str
+    language: str
+    created_at: datetime
+    last_login: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+# ---------- MEMBRESÍAS DE CUENTA ----------
+class AccountUserCreate(BaseModel):
+    user_email: EmailStr  # Se busca el usuario por email
+    role: Literal["owner", "admin", "member", "viewer"] = "member"
+    permissions: Optional[Dict[str, Any]] = None
+
+class AccountUserUpdate(BaseModel):
+    role: Optional[Literal["owner", "admin", "member", "viewer"]] = None
+    is_active: Optional[bool] = None
+    permissions: Optional[Dict[str, Any]] = None
+
+class AccountUserOut(BaseModel):
+    id: str
+    account_id: str
+    user_id: str
+    role: str
+    is_active: bool
+    permissions: Optional[Dict[str, Any]]
+    created_at: datetime
+    
+    # Datos del usuario (join)
+    user_email: Optional[str] = None
+    user_full_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+# ---------- AUTENTICACIÓN CON CUENTAS ----------
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+    accounts: List[AccountOut]  # Cuentas a las que pertenece
+    default_account_id: Optional[str] = None
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    full_name: str = Field(..., min_length=2, max_length=255)
+    password: str = Field(..., min_length=6)
+    account_name: str = Field(..., min_length=2, max_length=255)
+    phone: Optional[str] = None
+
+    @validator('account_name')
+    def validate_account_name(cls, v):
+        if not v.strip():
+            raise ValueError('El nombre de la cuenta no puede estar vacío')
+        return v.strip()
 
 # ---------- RESERVAS ----------
 class ReservationIn(BaseModel):

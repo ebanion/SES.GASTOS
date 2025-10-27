@@ -32,6 +32,24 @@ except Exception as e:
     print(f"[import] ❌ Error en auth router: {e}")
 
 try:
+    from .routers import auth_multiuser
+    print("[import] ✅ Auth multiuser router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en auth_multiuser router: {e}")
+
+try:
+    from .routers import accounts
+    print("[import] ✅ Accounts router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en accounts router: {e}")
+
+try:
+    from .routers import multiuser_web
+    print("[import] ✅ Multiuser web router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en multiuser_web router: {e}")
+
+try:
     from .routers import apartments
     print("[import] ✅ Apartments router importado")
 except Exception as e:
@@ -829,6 +847,28 @@ if auth:
         print("[router] ✅ Auth router incluido")
     except Exception as e:
         print(f"[router] ❌ Error incluyendo auth: {e}")
+
+# Incluir nuevos routers multiusuario
+try:
+    if 'auth_multiuser' in locals():
+        app.include_router(auth_multiuser.router)
+        print("[router] ✅ Auth multiuser router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo auth_multiuser: {e}")
+
+try:
+    if 'accounts' in locals():
+        app.include_router(accounts.router)
+        print("[router] ✅ Accounts router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo accounts: {e}")
+
+try:
+    if 'multiuser_web' in locals():
+        app.include_router(multiuser_web.router)
+        print("[router] ✅ Multiuser web router incluido")
+except Exception as e:
+    print(f"[router] ❌ Error incluyendo multiuser_web: {e}")
 
 if apartments:
     try:
@@ -1732,6 +1772,73 @@ async def webhook_status():
         print(f"Error verificando webhook: {e}")
         print(f"Traceback: {traceback.format_exc()}")
         return {"success": False, "error": str(e)}
+
+# ---------- ENDPOINTS DE MIGRACIÓN MULTIUSUARIO ----------
+
+@app.post("/migrate/to-multiuser")
+def migrate_to_multiuser():
+    """Migrar datos existentes al sistema multiusuario"""
+    try:
+        from .migration_multiuser import migrate_to_multiuser_system
+        from .db import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            result = migrate_to_multiuser_system(db)
+            return result
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error en migración multiusuario"
+        }
+
+@app.get("/migrate/status")
+def get_migration_status():
+    """Obtener estado de la migración multiusuario"""
+    try:
+        from .migration_multiuser import get_migration_status
+        from .db import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            result = get_migration_status(db)
+            return result
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/migrate/create-superadmin")
+def create_superadmin(
+    email: str = "admin@sesgas.com",
+    password: str = "admin123",
+    full_name: str = "Administrador Sistema"
+):
+    """Crear usuario superadministrador"""
+    try:
+        from .migration_multiuser import create_superadmin_user
+        from .db import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            result = create_superadmin_user(db, email, password, full_name)
+            return result
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 @app.get("/bot/diagnose")
 async def diagnose_bot():
