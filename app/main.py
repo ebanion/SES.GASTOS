@@ -23,6 +23,7 @@ email_webhooks = None
 vectors = None
 management = None
 fix_incomes = None
+real_time_api = None
 
 try:
     from .routers import auth
@@ -101,6 +102,12 @@ try:
     print("[import] ✅ Fix incomes router importado")
 except Exception as e:
     print(f"[import] ❌ Error en fix_incomes router: {e}")
+
+try:
+    from .routers import real_time_api
+    print("[import] ✅ Real time API router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en real_time_api router: {e}")
 
 # Importar admin_management por separado para evitar errores
 try:
@@ -906,6 +913,13 @@ if fix_incomes:
         print("[router] ✅ Fix incomes router incluido")
     except Exception as e:
         print(f"[router] ❌ Error incluyendo fix_incomes: {e}")
+
+if real_time_api:
+    try:
+        app.include_router(real_time_api.router)
+        print("[router] ✅ Real time API router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo real_time_api: {e}")
 
 if ADMIN_MANAGEMENT_AVAILABLE:
     try:
