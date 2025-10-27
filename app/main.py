@@ -22,6 +22,7 @@ email_setup = None
 email_webhooks = None
 vectors = None
 management = None
+fix_incomes = None
 
 try:
     from .routers import auth
@@ -94,6 +95,12 @@ try:
     print("[import] ✅ Management router importado")
 except Exception as e:
     print(f"[import] ❌ Error en management router: {e}")
+
+try:
+    from .routers import fix_incomes
+    print("[import] ✅ Fix incomes router importado")
+except Exception as e:
+    print(f"[import] ❌ Error en fix_incomes router: {e}")
 
 # Importar admin_management por separado para evitar errores
 try:
@@ -892,6 +899,13 @@ if management:
         print("[router] ✅ Management router incluido")
     except Exception as e:
         print(f"[router] ❌ Error incluyendo management: {e}")
+
+if fix_incomes:
+    try:
+        app.include_router(fix_incomes.router)
+        print("[router] ✅ Fix incomes router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo fix_incomes: {e}")
 
 if ADMIN_MANAGEMENT_AVAILABLE:
     try:
