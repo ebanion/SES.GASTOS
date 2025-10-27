@@ -1,7 +1,7 @@
 # app/main.py
 import os
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 # Importa modelos para que SQLAlchemy “conozca” las tablas
