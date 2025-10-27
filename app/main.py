@@ -315,6 +315,72 @@ def on_shutdown() -> None:
 def health():
     return {"ok": True}
 
+@app.post("/test-register")
+def test_register():
+    """Test simple de registro sin autenticación"""
+    try:
+        from .db import SessionLocal, engine, Base
+        from .models import User, Account, AccountUser
+        from .auth_multiuser import get_password_hash, create_account_slug, ensure_unique_slug
+        from datetime import datetime, timezone, timedelta
+        
+        # Crear tablas si no existen
+        Base.metadata.create_all(bind=engine)
+        
+        db = SessionLocal()
+        try:
+            # Crear usuario de prueba
+            test_user = User(
+                email="test@example.com",
+                full_name="Usuario Test",
+                password_hash=get_password_hash("123456"),
+                is_active=True
+            )
+            db.add(test_user)
+            db.flush()
+            
+            # Crear cuenta de prueba
+            test_account = Account(
+                name="Cuenta Test",
+                slug="test-account",
+                contact_email="test@example.com",
+                max_apartments=10,
+                trial_ends_at=datetime.now(timezone.utc) + timedelta(days=30)
+            )
+            db.add(test_account)
+            db.flush()
+            
+            # Crear membresía
+            membership = AccountUser(
+                account_id=test_account.id,
+                user_id=test_user.id,
+                role="owner",
+                invitation_accepted_at=datetime.now(timezone.utc)
+            )
+            db.add(membership)
+            db.commit()
+            
+            return {
+                "success": True,
+                "message": "Usuario test creado exitosamente",
+                "user_id": test_user.id,
+                "account_id": test_account.id,
+                "credentials": {
+                    "email": "test@example.com",
+                    "password": "123456"
+                }
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error creando usuario test"
+        }
+
 @app.get("/system-status")
 def system_status():
     """Diagnóstico completo del sistema"""

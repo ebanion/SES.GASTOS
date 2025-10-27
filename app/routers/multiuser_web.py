@@ -28,6 +28,58 @@ async def register_page(request: Request):
     """Página de registro de anfitrión"""
     return templates.TemplateResponse("multiuser_register.html", {"request": request})
 
+@router.get("/test", response_class=HTMLResponse)
+async def test_page(request: Request):
+    """Página de prueba simple"""
+    return HTMLResponse("""
+    <!DOCTYPE html>
+    <html>
+    <head><title>Test Multiuser</title></head>
+    <body>
+        <h1>🧪 Test del Sistema Multiusuario</h1>
+        <button onclick="testRegister()">Test Registro</button>
+        <button onclick="testLogin()">Test Login</button>
+        <div id="result"></div>
+        
+        <script>
+        async function testRegister() {
+            try {
+                const response = await fetch('/test-register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    '<h3>Resultado:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    '<h3>Error:</h3><p>' + error.message + '</p>';
+            }
+        }
+        
+        async function testLogin() {
+            try {
+                const response = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        email: 'test@example.com',
+                        password: '123456'
+                    })
+                });
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    '<h3>Login Result:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    '<h3>Login Error:</h3><p>' + error.message + '</p>';
+            }
+        }
+        </script>
+    </body>
+    </html>
+    """)
+
 # ---------- SELECTOR DE CUENTAS ----------
 
 @router.get("/account-selector", response_class=HTMLResponse)
