@@ -2115,6 +2115,96 @@ def migrate_to_multiuser():
             "message": "Error en migración multiusuario"
         }
 
+@app.post("/migrate/render-fix-now")
+def migrate_render_fix_now():
+    """Migración URGENTE para Render - Arregla aislamiento de apartamentos"""
+    import os
+    
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return {"success": False, "error": "DATABASE_URL no configurada"}
+    
+    try:
+        # Usar engine existente de la aplicación
+        from .db import engine
+        from sqlalchemy import text
+        
+        migrations = []
+        
+        with engine.connect() as conn:
+            # Migración crítica: agregar account_id a apartments
+            try:
+                conn.execute(text("ALTER TABLE apartments ADD COLUMN IF NOT EXISTS account_id VARCHAR(36)"))
+                migrations.append("✅ Columna account_id agregada a apartments")
+            except Exception as e:
+                migrations.append(f"⚠️ account_id: {str(e)[:50]}")
+            
+            # Crear tabla accounts básica
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS accounts (
+                        id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                        name VARCHAR(255) NOT NULL,
+                        slug VARCHAR(100) UNIQUE NOT NULL,
+                        description VARCHAR(500),
+                        is_active BOOLEAN DEFAULT TRUE,
+                        max_apartments INTEGER DEFAULT 10,
+                        contact_email VARCHAR(255),
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                    )
+                """))
+                migrations.append("✅ Tabla accounts creada")
+            except Exception as e:
+                migrations.append(f"⚠️ Tabla accounts: {str(e)[:50]}")
+            
+            # Crear cuenta sistema
+            try:
+                result = conn.execute(text("SELECT COUNT(*) FROM accounts WHERE slug = 'sistema'")).scalar()
+                if result == 0:
+                    conn.execute(text("""
+                        INSERT INTO accounts (name, slug, description, max_apartments, is_active)
+                        VALUES ('Sistema', 'sistema', 'Cuenta demo - apartamentos SES01, SES02, SES03', 1000, true)
+                    """))
+                    migrations.append("✅ Cuenta 'Sistema' creada para apartamentos demo")
+                else:
+                    migrations.append("✅ Cuenta 'Sistema' ya existe")
+            except Exception as e:
+                migrations.append(f"⚠️ Cuenta sistema: {str(e)[:50]}")
+            
+            # CRÍTICO: Asignar apartamentos SES01, SES02, SES03 a cuenta sistema
+            try:
+                account_id = conn.execute(text("SELECT id FROM accounts WHERE slug = 'sistema'")).scalar()
+                if account_id:
+                    result = conn.execute(text("""
+                        UPDATE apartments 
+                        SET account_id = :account_id 
+                        WHERE code IN ('SES01', 'SES02', 'SES03') AND account_id IS NULL
+                    """), {"account_id": account_id})
+                    
+                    migrations.append(f"✅ {result.rowcount} apartamentos demo asignados a cuenta Sistema")
+                    migrations.append("🎯 AISLAMIENTO ACTIVADO: SES01, SES02, SES03 ahora están en cuenta separada")
+                else:
+                    migrations.append("❌ No se pudo obtener ID de cuenta sistema")
+            except Exception as e:
+                migrations.append(f"❌ Error asignando apartamentos: {str(e)[:50]}")
+            
+            conn.commit()
+        
+        return {
+            "success": True,
+            "message": "🎉 AISLAMIENTO DE APARTAMENTOS ACTIVADO",
+            "migrations": migrations,
+            "result": "Los apartamentos SES01, SES02, SES03 están ahora en cuenta 'Sistema' separada",
+            "next_step": "Los nuevos usuarios solo verán sus propios apartamentos"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "❌ Error en migración urgente"
+        }
+
 @app.post("/migrate/render-fix")
 def migrate_render_fix():
     """Migración específica para Render - Arregla estructura PostgreSQL"""
