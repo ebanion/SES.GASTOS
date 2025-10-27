@@ -174,7 +174,11 @@ async def dashboard_page(request: Request):
 
             async function loadUserData() {
                 const token = localStorage.getItem('access_token');
+                console.log('🔍 [DEBUG] Loading user data...');
+                console.log('🔍 [DEBUG] Token exists:', !!token);
+                
                 if (!token) {
+                    console.log('❌ [DEBUG] No token, redirecting to login');
                     window.location.href = '/multiuser/login';
                     return;
                 }
@@ -184,19 +188,29 @@ async def dashboard_page(request: Request):
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
 
+                    console.log('🔍 [DEBUG] Auth response status:', response.status);
+
                     if (response.ok) {
                         const data = await response.json();
+                        console.log('🔍 [DEBUG] User data:', data.user);
+                        console.log('🔍 [DEBUG] Accounts data:', data.accounts);
+                        
                         userData = data.user;
                         accountsData = data.accounts;
                         currentAccountId = localStorage.getItem('current_account_id') || data.default_account_id;
+                        
+                        console.log('🔍 [DEBUG] Selected account ID:', currentAccountId);
+                        console.log('🔍 [DEBUG] Available accounts:', accountsData.map(acc => ({id: acc.id, name: acc.name})));
 
                         displayUserInfo();
                         await loadApartments();
                     } else {
+                        const errorText = await response.text();
+                        console.error('❌ [DEBUG] Auth failed:', response.status, errorText);
                         window.location.href = '/multiuser/login';
                     }
                 } catch (error) {
-                    console.error('Error loading user data:', error);
+                    console.error('❌ [DEBUG] Error loading user data:', error);
                     window.location.href = '/multiuser/login';
                 }
             }
@@ -212,6 +226,10 @@ async def dashboard_page(request: Request):
             async function loadApartments() {
                 const token = localStorage.getItem('access_token');
                 
+                console.log('🔍 [DEBUG] Loading apartments...');
+                console.log('🔍 [DEBUG] Token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
+                console.log('🔍 [DEBUG] Current Account ID:', currentAccountId);
+                
                 try {
                     const response = await fetch('/api/v1/apartments/', {
                         headers: {
@@ -220,14 +238,32 @@ async def dashboard_page(request: Request):
                         }
                     });
 
+                    console.log('🔍 [DEBUG] Response status:', response.status);
+                    
                     if (response.ok) {
                         const apartments = await response.json();
+                        console.log('🔍 [DEBUG] Apartments received:', apartments);
+                        console.log('🔍 [DEBUG] Number of apartments:', apartments.length);
+                        
+                        if (apartments.length > 0) {
+                            apartments.forEach((apt, index) => {
+                                console.log(`🔍 [DEBUG] Apartment ${index + 1}:`, {
+                                    code: apt.code,
+                                    name: apt.name,
+                                    account_id: apt.account_id,
+                                    owner_email: apt.owner_email
+                                });
+                            });
+                        }
+                        
                         displayDashboard(apartments);
                     } else {
+                        const errorText = await response.text();
+                        console.error('❌ [DEBUG] Error response:', errorText);
                         displayNoApartments();
                     }
                 } catch (error) {
-                    console.error('Error loading apartments:', error);
+                    console.error('❌ [DEBUG] Network error:', error);
                     displayNoApartments();
                 }
             }

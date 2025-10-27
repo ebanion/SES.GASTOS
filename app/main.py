@@ -338,9 +338,68 @@ def debug_test():
             "/debug/test",
             "/debug/multitenancy",
             "/debug/multitenancy-page",
-            "/fix-multitenancy"
+            "/fix-multitenancy",
+            "/debug/dashboard-apartments"
         ]
     }
+
+@app.get("/debug/dashboard-apartments")
+def debug_dashboard_apartments():
+    """Debug específico para apartamentos del dashboard"""
+    try:
+        from .db import SessionLocal
+        from . import models
+        
+        db = SessionLocal()
+        try:
+            # Obtener TODOS los apartamentos para ver qué hay
+            all_apartments = db.query(models.Apartment).all()
+            
+            apartments_info = []
+            for apt in all_apartments:
+                apartments_info.append({
+                    "id": apt.id,
+                    "code": apt.code,
+                    "name": apt.name,
+                    "owner_email": apt.owner_email,
+                    "account_id": apt.account_id,
+                    "is_active": apt.is_active,
+                    "created_at": str(apt.created_at) if apt.created_at else None
+                })
+            
+            # Obtener cuentas
+            accounts = db.query(models.Account).all()
+            accounts_info = []
+            for account in accounts:
+                accounts_info.append({
+                    "id": account.id,
+                    "name": account.name,
+                    "slug": account.slug,
+                    "contact_email": account.contact_email,
+                    "is_active": account.is_active
+                })
+            
+            return {
+                "success": True,
+                "total_apartments": len(all_apartments),
+                "total_accounts": len(accounts),
+                "apartments": apartments_info,
+                "accounts": accounts_info,
+                "problem_analysis": {
+                    "apartments_without_account": len([apt for apt in all_apartments if apt.account_id is None]),
+                    "apartments_in_sistema": len([apt for apt in all_apartments if apt.account_id and any(acc.slug == "sistema" and acc.id == apt.account_id for acc in accounts)]),
+                    "ses_apartments": [apt for apt in apartments_info if apt["code"] in ["SES01", "SES02", "SES03"]]
+                }
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 @app.post("/test-login")
 def test_login():
