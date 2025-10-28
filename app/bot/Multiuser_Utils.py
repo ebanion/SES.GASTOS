@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 
 # Configuración
-API_BASE_URL = os.getenv("API_BASE_URL") or os.getenv("API_URL") or "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL") or os.getenv("API_URL") or "https://ses-gastos.onrender.com"
 INTERNAL_KEY = os.getenv("INTERNAL_KEY") or os.getenv("ADMIN_KEY")
 
 # Cache de usuarios y cuentas
