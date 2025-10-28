@@ -15,3 +15,6 @@ ses_gastos_persistent.db
 # Editor/OS
 .vscode/
 .DS_Store
+
+# NO ignorar .env.render.example (es documentación)
+!.env.render.example
