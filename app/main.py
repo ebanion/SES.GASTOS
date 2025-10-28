@@ -165,9 +165,9 @@ def database_status():
         from .db import DATABASE_URL, engine
         import os
         
-        # Información de la base de datos
+        # Información de la base de datos actual
         db_info = {
-            "database_url": str(engine.url).replace(str(engine.url).split('@')[0].split(':')[-1], "***") if '@' in str(engine.url) else str(engine.url),
+            "current_database_url": str(engine.url).replace(str(engine.url).split('@')[0].split(':')[-1], "***") if '@' in str(engine.url) else str(engine.url),
             "database_type": "PostgreSQL" if "postgresql" in str(engine.url) else "SQLite",
             "is_temporary": "/tmp/" in str(engine.url),
             "persistence": "❌ TEMPORAL (se pierde en despliegues)" if "/tmp/" in str(engine.url) else "✅ PERSISTENTE"
@@ -175,20 +175,75 @@ def database_status():
         
         # Variables de entorno disponibles
         env_vars = {
-            "DATABASE_URL": "✅" if os.getenv("DATABASE_URL") else "❌",
-            "DATABASE_PRIVATE_URL": "✅" if os.getenv("DATABASE_PRIVATE_URL") else "❌", 
-            "POSTGRES_URL": "✅" if os.getenv("POSTGRES_URL") else "❌"
+            "DATABASE_URL": os.getenv("DATABASE_URL", "No configurada"),
+            "DATABASE_PRIVATE_URL": os.getenv("DATABASE_PRIVATE_URL", "No configurada"), 
+            "POSTGRES_URL": os.getenv("POSTGRES_URL", "No configurada")
         }
+        
+        # Información de PostgreSQL específica
+        postgres_info = {}
+        database_url_env = os.getenv("DATABASE_URL")
+        if database_url_env:
+            postgres_info["original_database_url"] = database_url_env.replace(database_url_env.split('@')[0].split(':')[-1], "***") if '@' in database_url_env else database_url_env
+            postgres_info["contains_postgresql"] = "postgresql" in database_url_env
+            postgres_info["url_format_valid"] = database_url_env.startswith(("postgresql://", "postgres://"))
         
         return {
             "success": True,
             "database_info": db_info,
             "environment_variables": env_vars,
-            "recommendation": "Configurar PostgreSQL en Render para persistencia" if db_info["is_temporary"] else "Base de datos configurada correctamente"
+            "postgresql_analysis": postgres_info,
+            "recommendation": "PostgreSQL configurado pero fallando - revisar logs de conexión" if database_url_env and "postgresql" in database_url_env else "Configurar PostgreSQL en Render para persistencia"
         }
         
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.get("/debug/test-postgres-connection")
+def test_postgres_connection():
+    """Probar conexión directa a PostgreSQL"""
+    try:
+        import os
+        from sqlalchemy import create_engine, text
+        
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url or "postgresql" not in database_url:
+            return {
+                "success": False,
+                "error": "No hay DATABASE_URL de PostgreSQL configurada"
+            }
+        
+        # Normalizar URL
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif database_url.startswith("postgresql://"):
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        
+        # Intentar conexión directa
+        test_engine = create_engine(
+            database_url,
+            connect_args={
+                "connect_timeout": 10,
+                "sslmode": "require"
+            }
+        )
+        
+        with test_engine.connect() as conn:
+            version = conn.execute(text("SELECT version()")).scalar()
+            return {
+                "success": True,
+                "message": "Conexión PostgreSQL exitosa",
+                "postgres_version": version.split()[1] if version else "Unknown",
+                "database_url_masked": database_url.replace(database_url.split('@')[0].split(':')[-1], "***") if '@' in database_url else database_url
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "database_url_masked": database_url.replace(database_url.split('@')[0].split(':')[-1], "***") if '@' in database_url else database_url
+        }
 
 @app.post("/debug/create-test-user")
 def create_test_user(db: Session = Depends(get_db)):
