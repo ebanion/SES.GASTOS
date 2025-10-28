@@ -150,6 +150,75 @@ app = FastAPI(title="SES.GASTOS")
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+@app.post("/debug/create-test-user")
+def create_test_user():
+    """Crear usuario de prueba para testing con SQLite"""
+    try:
+        db = next(get_db())
+        
+        # Crear cuenta de prueba
+        test_account = models.Account(
+            name="Cuenta de Prueba",
+            slug="prueba",
+            description="Cuenta para testing del bot",
+            max_apartments=10
+        )
+        db.add(test_account)
+        db.flush()
+        
+        # Crear usuario de prueba
+        from passlib.context import CryptContext
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        test_user = models.User(
+            email="test@sesgas.com",
+            full_name="Usuario de Prueba",
+            hashed_password=pwd_context.hash("test123"),
+            is_active=True
+        )
+        db.add(test_user)
+        db.flush()
+        
+        # Asociar usuario con cuenta
+        account_user = models.AccountUser(
+            user_id=test_user.id,
+            account_id=test_account.id,
+            role="owner"
+        )
+        db.add(account_user)
+        
+        # Crear apartamento de prueba
+        test_apartment = models.Apartment(
+            code="TEST01",
+            name="Apartamento de Prueba",
+            owner_email="test@sesgas.com",
+            account_id=test_account.id,
+            is_active=True
+        )
+        db.add(test_apartment)
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Usuario de prueba creado",
+            "credentials": {
+                "email": "test@sesgas.com",
+                "password": "test123",
+                "apartment_code": "TEST01"
+            },
+            "instructions": [
+                "1. En el bot: /login",
+                "2. Email: test@sesgas.com",
+                "3. Password: test123",
+                "4. /usar TEST01",
+                "5. Enviar gasto de prueba"
+            ]
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # Crear/migrar tablas al arrancar
 @app.on_event("startup")
 def on_startup() -> None:
@@ -216,6 +285,7 @@ def on_startup() -> None:
                 {"code": "SES03", "name": "Apartamento Montaña", "owner_email": "admin@sesgas.com"}
             ]
             
+            created_apartments = []
             for apt_data in default_apartments:
                 apt = models.Apartment(
                     code=apt_data["code"],
@@ -225,6 +295,7 @@ def on_startup() -> None:
                     is_active=True
                 )
                 db.add(apt)
+                created_apartments.append(apt)
             
             db.commit()
             print(f"[startup] Created {len(default_apartments)} default apartments")
