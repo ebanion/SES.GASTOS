@@ -72,19 +72,18 @@ connect_args = {}
 if "postgresql" in DATABASE_URL:
     print("[DB] 🐘 Configurando PostgreSQL...")
     try:
-        # Configuración optimizada para Render PostgreSQL
+        # Configuración simplificada para Render PostgreSQL
         connect_args = {
-            "connect_timeout": 30,
-            "application_name": "ses-gastos-render",
-            "sslmode": "require"
+            "connect_timeout": 10,
+            "application_name": "ses-gastos"
         }
         
         engine = create_engine(
             DATABASE_URL, 
             pool_pre_ping=True, 
             connect_args=connect_args,
-            pool_timeout=60,
-            pool_recycle=3600,
+            pool_timeout=30,
+            pool_recycle=1800,
             echo=False
         )
         
@@ -121,15 +120,20 @@ if "postgresql" in DATABASE_URL:
         except ImportError as imp_err:
             print(f"[DB] ❌ psycopg import error: {imp_err}")
         
-        # En producción, usar SQLite como fallback temporal
-        print("[DB] ⚠️ PostgreSQL falló, usando SQLite como fallback temporal")
+        # SOLUCIÓN ROBUSTA: Usar SQLite persistente en lugar de temporal
+        print("[DB] ⚠️ PostgreSQL falló, usando SQLite persistente como fallback")
         print(f"[DB] 🔍 Error PostgreSQL: {pg_error}")
-        db_dir = os.getenv("SQLITE_DIR", "/tmp")
-        DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos.db"
+        
+        # Usar directorio persistente en lugar de /tmp
+        db_dir = "/opt/render/project/src"  # Directorio persistente en Render
+        if not os.path.exists(db_dir):
+            db_dir = "/tmp"  # Fallback si no existe
+        
+        DATABASE_URL = f"sqlite:///{db_dir}/ses_gastos_persistent.db"
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-        print(f"[DB] 📁 SQLite temporal: {db_dir}/ses_gastos.db")
-        print("[DB] 💡 Esto permite que la app funcione mientras se arregla PostgreSQL")
-        print("[DB] 🚨 IMPORTANTE: Los datos se perderán en cada despliegue hasta que PostgreSQL funcione")
+        print(f"[DB] 📁 SQLite persistente: {db_dir}/ses_gastos_persistent.db")
+        print("[DB] 💡 Los datos se mantendrán entre despliegues hasta que PostgreSQL funcione")
+        print("[DB] 🔧 Para arreglar PostgreSQL, verifica las credenciales en Render Environment")
 else:
     print("[DB] 📁 Usando SQLite (desarrollo)...")
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
