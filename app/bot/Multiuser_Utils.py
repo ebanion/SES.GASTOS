@@ -232,7 +232,7 @@ def send_expense_to_account(telegram_id: int, expense_data: Dict[str, Any]) -> T
         # Limpiar datos
         expense_data.pop("apartment_code", None)
         
-        # Enviar gasto
+        # Enviar gasto al endpoint multiusuario
         response = requests.post(
             f"{api_base}/api/v1/expenses/",
             json=expense_data,
@@ -247,8 +247,18 @@ def send_expense_to_account(telegram_id: int, expense_data: Dict[str, Any]) -> T
         if response.status_code in (200, 201):
             return True, "Gasto registrado exitosamente"
         else:
-            error_data = response.json()
-            return False, error_data.get("detail", "Error registrando gasto")
+            try:
+                error_data = response.json()
+                error_msg = error_data.get("detail", "Error registrando gasto")
+            except:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+            
+            # Log para debugging
+            print(f"[Bot] Error enviando gasto: {response.status_code} - {error_msg}")
+            print(f"[Bot] Request data: {expense_data}")
+            print(f"[Bot] Response: {response.text}")
+            
+            return False, f"Error del servidor: HTTP {response.status_code}\n{error_msg}"
             
     except Exception as e:
         return False, f"Error enviando gasto: {str(e)}"

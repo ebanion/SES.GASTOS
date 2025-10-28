@@ -5,9 +5,11 @@ import os
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import and_
 
 from ..db import get_db
 from .. import models, schemas
+from ..auth_multiuser import get_current_account, require_member_or_above
 
 router = APIRouter(prefix="/api/v1/expenses", tags=["expenses"])
 
@@ -19,6 +21,76 @@ def require_internal_key(
     provided = x_internal_key or key
     if not admin or provided != admin:
         raise HTTPException(status_code=403, detail="Forbidden")
+
+# ---------- NUEVO ENDPOINT MULTIUSUARIO ----------
+
+@router.post("/", response_model=schemas.ExpenseOut)
+def create_expense_multiuser(
+    payload: schemas.ExpenseIn, 
+    current_account: models.Account = Depends(get_current_account),
+    membership: models.AccountUser = Depends(require_member_or_above),
+    db: Session = Depends(get_db)
+):
+    """Crear gasto en la cuenta actual (sistema multiusuario)"""
+    
+    # Verificar que el apartamento existe y pertenece a la cuenta actual
+    apt = db.query(models.Apartment).filter(
+        and_(
+            models.Apartment.id == str(payload.apartment_id),
+            models.Apartment.account_id == current_account.id
+        )
+    ).first()
+    
+    if not apt:
+        raise HTTPException(
+            status_code=404, 
+            detail="apartment_not_found_in_account"
+        )
+
+    # Crear gasto
+    expense = models.Expense(
+        apartment_id=str(payload.apartment_id),
+        date=payload.date,
+        amount_gross=payload.amount_gross,
+        currency=payload.currency,
+        category=payload.category,
+        description=payload.description,
+        vendor=payload.vendor,
+        invoice_number=payload.invoice_number,
+        source=payload.source,
+        vat_rate=payload.vat_rate,
+        file_url=payload.file_url,
+        status=payload.status,
+    )
+
+    try:
+        db.add(expense)
+        db.commit()
+        db.refresh(expense)
+    except SQLAlchemyError as ex:
+        db.rollback()
+        raise HTTPException(
+            status_code=400, 
+            detail=f"db_error: {str(ex.orig) if hasattr(ex, 'orig') else str(ex)}"
+        )
+
+    return schemas.ExpenseOut(
+        id=expense.id,
+        apartment_id=expense.apartment_id,
+        date=expense.date,
+        amount_gross=expense.amount_gross,
+        currency=expense.currency,
+        category=expense.category,
+        description=expense.description,
+        vendor=expense.vendor,
+        invoice_number=expense.invoice_number,
+        source=expense.source,
+        vat_rate=expense.vat_rate,
+        file_url=expense.file_url,
+        status=expense.status,
+    )
+
+# ---------- LEGACY ENDPOINT ----------
 
 @router.post("", response_model=schemas.ExpenseOut, dependencies=[Depends(require_internal_key)])
 def create_expense(payload: schemas.ExpenseIn, db: Session = Depends(get_db)):
