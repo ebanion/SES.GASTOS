@@ -138,6 +138,13 @@ except Exception as e:
     ADMIN_MANAGEMENT_AVAILABLE = False
 
 try:
+    from .routers import chat
+    print("[import] ✅ Chat integrado importado")
+except Exception as e:
+    print(f"[import] ❌ Error en chat router: {e}")
+    chat = None
+
+try:
     from .dashboard_api import router as dashboard_router
     print("[import] ✅ Dashboard importado")
 except Exception as e:
@@ -1449,6 +1456,13 @@ try:
     print("[router] ✅ Telegram webhook router incluido")
 except Exception as e:
     print(f"[router] ❌ Error incluyendo telegram webhook: {e}")
+
+if chat:
+    try:
+        app.include_router(chat.router)
+        print("[router] ✅ Chat integrado router incluido")
+    except Exception as e:
+        print(f"[router] ❌ Error incluyendo chat: {e}")
 
 if dashboard_router:
     try:

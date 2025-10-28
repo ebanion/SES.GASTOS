@@ -905,16 +905,16 @@ async def dashboard_page(request: Request):
                         </div>
 
                         <div class="card">
-                            <h3>🤖 Bot de Telegram</h3>
-                            <p>Envía fotos de facturas y se procesarán automáticamente</p>
+                            <h3>🤖 Asistente Virtual</h3>
+                            <p>Tu gestor automático de gastos con IA integrada</p>
                             <br>
-                            <a href="https://t.me/UriApartment_Bot" target="_blank" class="btn" 
-                               style="background: #0088cc; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">
-                                Abrir Bot
-                            </a>
-                            <button onclick="showBotInstructions()" class="btn" 
+                            <button onclick="openChat()" class="btn" 
+                                    style="background: #667eea; color: white; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;">
+                                💬 Abrir Chat
+                            </button>
+                            <button onclick="showChatFeatures()" class="btn" 
                                     style="background: #f8f9fa; color: #333; padding: 8px 16px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer;">
-                                Ver instrucciones
+                                Ver funciones
                             </button>
                         </div>
 
@@ -1150,9 +1150,250 @@ Por ahora usa el Dashboard Completo.`);
                 window.location.href = '/multiuser/login';
             }
 
+            // ========== FUNCIONES DEL CHAT INTEGRADO ==========
+            
+            function openChat() {
+                document.getElementById('chatModal').style.display = 'block';
+                document.body.style.overflow = 'hidden';
+            }
+            
+            function closeChat() {
+                document.getElementById('chatModal').style.display = 'none';
+                document.body.style.overflow = 'auto';
+            }
+            
+            function showChatFeatures() {
+                alert(`🤖 Funciones del Asistente Virtual:
+
+📸 SUBIR FACTURAS
+• Sube fotos de tickets y facturas
+• OCR automático + IA para extraer datos
+• Categorización inteligente
+
+✍️ ESCRIBIR GASTOS
+• "Restaurante La Marina, 35€, cena"
+• "Taxi aeropuerto, 25€"
+• "Supermercado, 67.45€, compra semanal"
+
+🏠 GESTIONAR APARTAMENTOS
+• Ver lista de apartamentos
+• Crear nuevos apartamentos
+• Cambiar apartamento activo
+
+📊 CONSULTAS
+• "¿Cuánto gasté este mes?"
+• "Mostrar gastos de limpieza"
+• "Resumen del apartamento SES01"`);
+            }
+            
+            async function sendMessage() {
+                const input = document.getElementById('chatInput');
+                const message = input.value.trim();
+                
+                if (!message) return;
+                
+                // Agregar mensaje del usuario
+                addChatMessage(message, 'user');
+                input.value = '';
+                
+                // Mostrar indicador de escritura
+                addTypingIndicator();
+                
+                try {
+                    // Enviar al endpoint de chat
+                    const response = await fetch('/api/v1/chat/message', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                            'X-Account-ID': currentAccountId
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            context: 'dashboard'
+                        })
+                    });
+                    
+                    removeTypingIndicator();
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        addChatMessage(data.response, 'assistant');
+                        
+                        // Si se creó un gasto, actualizar dashboard
+                        if (data.action === 'expense_created') {
+                            setTimeout(() => {
+                                loadUserData(); // Recargar datos
+                            }, 1000);
+                        }
+                    } else {
+                        addChatMessage('❌ Error procesando tu mensaje. Inténtalo de nuevo.', 'assistant');
+                    }
+                } catch (error) {
+                    removeTypingIndicator();
+                    addChatMessage('❌ Error de conexión. Verifica tu internet.', 'assistant');
+                }
+            }
+            
+            function addChatMessage(message, sender) {
+                const messagesContainer = document.getElementById('chatMessages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `chat-message ${sender}`;
+                messageDiv.style.marginBottom = '16px';
+                messageDiv.style.textAlign = sender === 'user' ? 'right' : 'left';
+                
+                const bubble = document.createElement('div');
+                bubble.style.display = 'inline-block';
+                bubble.style.maxWidth = '80%';
+                bubble.style.padding = '12px 16px';
+                bubble.style.borderRadius = sender === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px';
+                bubble.style.background = sender === 'user' ? '#667eea' : '#f1f5f9';
+                bubble.style.color = sender === 'user' ? 'white' : '#374151';
+                bubble.innerHTML = message.replace(/\\n/g, '<br>');
+                
+                messageDiv.appendChild(bubble);
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            function addTypingIndicator() {
+                const messagesContainer = document.getElementById('chatMessages');
+                const typingDiv = document.createElement('div');
+                typingDiv.id = 'typingIndicator';
+                typingDiv.style.marginBottom = '16px';
+                typingDiv.innerHTML = `
+                    <div style="display: inline-block; background: #f1f5f9; padding: 12px 16px; border-radius: 18px 18px 18px 4px; color: #64748b;">
+                        <span style="animation: pulse 1.5s infinite;">🤖 Escribiendo...</span>
+                    </div>
+                `;
+                messagesContainer.appendChild(typingDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            function removeTypingIndicator() {
+                const indicator = document.getElementById('typingIndicator');
+                if (indicator) {
+                    indicator.remove();
+                }
+            }
+            
+            function handleChatKeyPress(event) {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage();
+                }
+            }
+            
+            async function handleImageUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                // Validar tipo de archivo
+                if (!file.type.startsWith('image/')) {
+                    alert('❌ Solo se permiten archivos de imagen');
+                    return;
+                }
+                
+                // Validar tamaño (máximo 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('❌ La imagen es muy grande. Máximo 10MB');
+                    return;
+                }
+                
+                addChatMessage('📸 Procesando imagen...', 'user');
+                addTypingIndicator();
+                
+                try {
+                    // Crear FormData para subir la imagen
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    formData.append('context', 'dashboard');
+                    
+                    const response = await fetch('/api/v1/chat/image', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                            'X-Account-ID': currentAccountId
+                        },
+                        body: formData
+                    });
+                    
+                    removeTypingIndicator();
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        addChatMessage(data.response, 'assistant');
+                        
+                        // Si se creó un gasto, actualizar dashboard
+                        if (data.action === 'expense_created') {
+                            setTimeout(() => {
+                                loadUserData(); // Recargar datos
+                            }, 1000);
+                        }
+                    } else {
+                        addChatMessage('❌ Error procesando la imagen. Inténtalo de nuevo.', 'assistant');
+                    }
+                } catch (error) {
+                    removeTypingIndicator();
+                    addChatMessage('❌ Error subiendo la imagen. Verifica tu conexión.', 'assistant');
+                }
+                
+                // Limpiar input
+                event.target.value = '';
+            }
+
             // Inicializar
             loadUserData();
         </script>
+        
+        <!-- Modal del Chat Integrado -->
+        <div id="chatModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 800px; height: 80%; background: white; border-radius: 12px; display: flex; flex-direction: column;">
+                <!-- Header del Chat -->
+                <div style="padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px 12px 0 0;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 18px;">🤖 Asistente Virtual</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">Tu gestor automático de gastos</p>
+                    </div>
+                    <button onclick="closeChat()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 16px;">✕</button>
+                </div>
+                
+                <!-- Área de mensajes -->
+                <div id="chatMessages" style="flex: 1; padding: 20px; overflow-y: auto; background: #f8fafc;">
+                    <div class="chat-message assistant" style="margin-bottom: 16px;">
+                        <div style="background: #667eea; color: white; padding: 12px 16px; border-radius: 18px 18px 18px 4px; max-width: 80%; display: inline-block;">
+                            ¡Hola! 👋 Soy tu asistente virtual para gestionar gastos.<br><br>
+                            <strong>¿Qué puedo hacer por ti?</strong><br>
+                            • 📸 Procesar fotos de facturas<br>
+                            • ✍️ Registrar gastos escritos<br>
+                            • 🏠 Gestionar apartamentos<br>
+                            • 📊 Mostrar estadísticas<br><br>
+                            <em>Escribe un gasto o sube una foto para empezar</em>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Input del Chat -->
+                <div style="padding: 20px; border-top: 1px solid #e2e8f0; background: white; border-radius: 0 0 12px 12px;">
+                    <div style="display: flex; gap: 12px; align-items: end;">
+                        <div style="flex: 1;">
+                            <textarea id="chatInput" placeholder="Escribe un gasto: 'Restaurante La Marina, 35€, cena' o haz una pregunta..." 
+                                     style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; resize: none; font-family: inherit; min-height: 44px; max-height: 120px;"
+                                     onkeypress="handleChatKeyPress(event)"></textarea>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <button onclick="sendMessage()" style="background: #667eea; color: white; border: none; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-weight: 500;">
+                                Enviar
+                            </button>
+                            <label for="imageUpload" style="background: #10b981; color: white; border: none; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-weight: 500; text-align: center; font-size: 14px;">
+                                📸 Foto
+                            </label>
+                            <input type="file" id="imageUpload" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </body>
     </html>
     """)
