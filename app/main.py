@@ -1,13 +1,14 @@
 # app/main.py
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
 
 # Importa modelos para que SQLAlchemy “conozca” las tablas
 from . import models  # noqa
 
-from .db import Base, engine
+from .db import Base, engine, get_db
 
 # Importaciones básicas primero - importar individualmente para evitar fallos en cadena
 auth = None
@@ -151,10 +152,9 @@ app = FastAPI(title="SES.GASTOS")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 @app.post("/debug/create-test-user")
-def create_test_user():
+def create_test_user(db: Session = Depends(get_db)):
     """Crear usuario de prueba para testing con SQLite"""
     try:
-        db = next(get_db())
         
         # Crear cuenta de prueba
         test_account = models.Account(
@@ -214,6 +214,88 @@ def create_test_user():
                 "4. /usar TEST01",
                 "5. Enviar gasto de prueba"
             ]
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/debug/bot-auth")
+def debug_bot_auth():
+    """Debug de autenticación del bot"""
+    try:
+        from sqlalchemy.orm import Session
+        db = next(get_db())
+        
+        # Verificar tablas existentes
+        tables_info = {}
+        
+        # Verificar usuarios
+        users_count = db.query(models.User).count()
+        users = db.query(models.User).limit(5).all()
+        tables_info["users"] = {
+            "count": users_count,
+            "sample": [{"id": u.id, "email": u.email, "full_name": u.full_name} for u in users]
+        }
+        
+        # Verificar cuentas
+        accounts_count = db.query(models.Account).count()
+        accounts = db.query(models.Account).limit(5).all()
+        tables_info["accounts"] = {
+            "count": accounts_count,
+            "sample": [{"id": a.id, "name": a.name, "slug": a.slug} for a in accounts]
+        }
+        
+        # Verificar apartamentos
+        apartments_count = db.query(models.Apartment).count()
+        apartments = db.query(models.Apartment).limit(5).all()
+        tables_info["apartments"] = {
+            "count": apartments_count,
+            "sample": [{"id": a.id, "code": a.code, "name": a.name, "account_id": a.account_id} for a in apartments]
+        }
+        
+        # Verificar relaciones usuario-cuenta
+        account_users_count = db.query(models.AccountUser).count()
+        account_users = db.query(models.AccountUser).limit(5).all()
+        tables_info["account_users"] = {
+            "count": account_users_count,
+            "sample": [{"user_id": au.user_id, "account_id": au.account_id, "role": au.role} for au in account_users]
+        }
+        
+        return {
+            "success": True,
+            "database_type": "SQLite" if "sqlite" in str(engine.url) else "PostgreSQL",
+            "database_url": str(engine.url).replace(str(engine.url).split('@')[0].split(':')[-1], "***") if '@' in str(engine.url) else str(engine.url),
+            "tables": tables_info,
+            "instructions": {
+                "create_user": "POST /debug/create-test-user",
+                "test_login": "POST /api/v1/auth/login with email/password",
+                "test_apartments": "GET /api/v1/apartments/ with Authorization header"
+            }
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/debug/test-login")
+def debug_test_login(credentials: dict):
+    """Test login endpoint"""
+    try:
+        email = credentials.get("email", "test@sesgas.com")
+        password = credentials.get("password", "test123")
+        
+        # Simular login
+        import requests
+        response = requests.post(
+            "https://ses-gastos.onrender.com/api/v1/auth/login",
+            json={"email": email, "password": password},
+            timeout=10
+        )
+        
+        return {
+            "success": True,
+            "status_code": response.status_code,
+            "response": response.json() if response.status_code == 200 else response.text,
+            "headers": dict(response.headers)
         }
         
     except Exception as e:
