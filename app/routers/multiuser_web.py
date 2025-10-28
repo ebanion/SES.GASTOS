@@ -372,7 +372,7 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
             }
 
             function openFullDashboard() {
-                // Redirigir al dashboard personal del anfitrión con autenticación
+                // Mostrar dashboard integrado directamente (SIN redireccionar)
                 const token = localStorage.getItem('access_token');
                 const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
                 
@@ -382,13 +382,7 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
                     return;
                 }
                 
-                // Crear URL con parámetros de autenticación
-                const dashboardUrl = `/api/v1/dashboard/?token=${encodeURIComponent(token)}&account_id=${encodeURIComponent(currentAccountId)}`;
-                
-                // Abrir en la misma ventana para mantener la sesión
-                window.location.href = dashboardUrl;
-                
-                // Alternativa: Mostrar dashboard simplificado inline
+                // Mostrar dashboard integrado en la misma página
                 showSimpleDashboard();
             }
             
