@@ -173,7 +173,7 @@ def create_test_user(db: Session = Depends(get_db)):
         test_user = models.User(
             email="test@sesgas.com",
             full_name="Usuario de Prueba",
-            hashed_password=pwd_context.hash("test123"),
+            password_hash=pwd_context.hash("test123"),
             is_active=True
         )
         db.add(test_user)
