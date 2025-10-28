@@ -97,6 +97,185 @@ async def account_selector_page(request: Request):
 
 # ---------- DASHBOARD PRINCIPAL ----------
 
+@router.get("/dashboard-personal", response_class=HTMLResponse)
+async def dashboard_personal_page(request: Request):
+    """Dashboard personal integrado - sin redirecciones"""
+    return HTMLResponse("""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Mi Dashboard Personal - SES.GASTOS</title>
+        <style>
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                margin: 0; padding: 20px; background: #f5f5f5; min-height: 100vh;
+            }
+            .container { max-width: 1200px; margin: 0 auto; }
+            .header { 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px;
+                display: flex; justify-content: space-between; align-items: center;
+            }
+            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+            .card { 
+                background: white; padding: 20px; border-radius: 12px; 
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            .btn { 
+                padding: 8px 16px; background: #667eea; color: white;
+                border: none; border-radius: 6px; cursor: pointer; text-decoration: none;
+                display: inline-block;
+            }
+            .btn:hover { background: #5a6fd8; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>📊 Mi Dashboard Personal</h1>
+                <a href="/multiuser/dashboard" class="btn">← Volver al Dashboard</a>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <h3>🏠 Filtrar por Apartamento</h3>
+                    <select id="apartmentFilter" onchange="loadStats()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="">Todos mis apartamentos</option>
+                    </select>
+                </div>
+                
+                <div class="card">
+                    <h3>📈 Resumen 2025</h3>
+                    <div id="stats">
+                        <div style="text-align: center; padding: 20px;">
+                            <div style="font-size: 24px; color: #4caf50; margin: 8px;">€0.00</div>
+                            <div style="color: #666;">Ingresos Totales</div>
+                            <div style="font-size: 24px; color: #f44336; margin: 8px;">€0.00</div>
+                            <div style="color: #666;">Gastos Totales</div>
+                            <div style="font-size: 24px; color: #2196f3; margin: 8px;">€0.00</div>
+                            <div style="color: #666;">Balance</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>💸 Últimos Gastos</h3>
+                    <div id="expenses">
+                        <p style="text-align: center; color: #666; padding: 20px;">
+                            No hay gastos registrados aún.<br>
+                            <small>Usa el bot de Telegram para agregar gastos.</small>
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>🤖 Bot de Telegram</h3>
+                    <p>Para agregar gastos automáticamente:</p>
+                    <ol>
+                        <li>Busca <strong>@UriApartment_Bot</strong></li>
+                        <li>Envía <code>/start</code></li>
+                        <li>Configura con <code>/usar TU_CODIGO</code></li>
+                        <li>¡Envía fotos de facturas!</li>
+                    </ol>
+                    <a href="https://t.me/UriApartment_Bot" target="_blank" class="btn">🤖 Abrir Bot</a>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let token = localStorage.getItem('access_token');
+            let accountId = localStorage.getItem('current_account_id');
+            
+            async function loadUserData() {
+                if (!token) {
+                    window.location.href = '/multiuser/login';
+                    return;
+                }
+                
+                try {
+                    // Cargar apartamentos
+                    const response = await fetch('/api/v1/apartments/', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'X-Account-ID': accountId
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const apartments = await response.json();
+                        updateApartmentFilter(apartments);
+                        loadStats();
+                    } else {
+                        console.error('Error loading apartments');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            }
+            
+            function updateApartmentFilter(apartments) {
+                const select = document.getElementById('apartmentFilter');
+                select.innerHTML = '<option value="">Todos mis apartamentos</option>';
+                
+                apartments.forEach(apt => {
+                    const option = document.createElement('option');
+                    option.value = apt.code;
+                    option.textContent = `${apt.code} - ${apt.name}`;
+                    select.appendChild(option);
+                });
+            }
+            
+            async function loadStats() {
+                const selectedApartment = document.getElementById('apartmentFilter').value;
+                
+                try {
+                    let url = '/api/v1/dashboard/monthly?year=2025';
+                    if (selectedApartment) {
+                        url += `&apartment_code=${selectedApartment}`;
+                    }
+                    
+                    const response = await fetch(url, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'X-Account-ID': accountId
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        updateStats(data);
+                    }
+                } catch (error) {
+                    console.error('Error loading stats:', error);
+                }
+            }
+            
+            function updateStats(data) {
+                const totalIncome = data.items.reduce((sum, item) => sum + item.incomes_accepted + item.incomes_pending, 0);
+                const totalExpenses = data.items.reduce((sum, item) => sum + item.expenses, 0);
+                const balance = totalIncome - totalExpenses;
+                
+                document.getElementById('stats').innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 24px; color: #4caf50; margin: 8px;">€${totalIncome.toFixed(2)}</div>
+                        <div style="color: #666;">Ingresos Totales</div>
+                        <div style="font-size: 24px; color: #f44336; margin: 8px;">€${totalExpenses.toFixed(2)}</div>
+                        <div style="color: #666;">Gastos Totales</div>
+                        <div style="font-size: 24px; color: ${balance >= 0 ? '#4caf50' : '#f44336'}; margin: 8px;">€${balance.toFixed(2)}</div>
+                        <div style="color: #666;">Balance</div>
+                    </div>
+                `;
+            }
+            
+            // Inicializar
+            loadUserData();
+        </script>
+    </body>
+    </html>
+    """)
+
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     """Dashboard principal de la cuenta seleccionada"""
@@ -372,9 +551,8 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
             }
 
             function openFullDashboard() {
-                // Mostrar dashboard integrado directamente (SIN redireccionar)
+                // Redirigir al dashboard personal dedicado (mantiene autenticación)
                 const token = localStorage.getItem('access_token');
-                const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
                 
                 if (!token || !currentAccountId) {
                     alert('❌ Error de autenticación. Por favor, inicia sesión nuevamente.');
@@ -382,8 +560,8 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
                     return;
                 }
                 
-                // Mostrar dashboard integrado en la misma página
-                showSimpleDashboard();
+                // Redirigir al dashboard personal que usa localStorage para autenticación
+                window.location.href = '/multiuser/dashboard-personal';
             }
             
             function showSimpleDashboard() {
