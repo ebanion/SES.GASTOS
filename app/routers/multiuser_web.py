@@ -99,102 +99,208 @@ async def account_selector_page(request: Request):
 
 @router.get("/dashboard-personal", response_class=HTMLResponse)
 async def dashboard_personal_page(request: Request):
-    """Dashboard personal integrado - sin redirecciones"""
+    """Dashboard financiero completo para anfitriones - sin redirecciones"""
     return HTMLResponse("""
     <!DOCTYPE html>
     <html lang="es">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Mi Dashboard Personal - SES.GASTOS</title>
+        <title>Dashboard Financiero - SES.GASTOS</title>
         <style>
             body { 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                margin: 0; padding: 20px; background: #f5f5f5; min-height: 100vh;
+                margin: 0; padding: 20px; background: #f8fafc; min-height: 100vh;
             }
-            .container { max-width: 1200px; margin: 0 auto; }
+            .container { max-width: 1400px; margin: 0 auto; }
             .header { 
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px;
+                color: white; padding: 24px; border-radius: 16px; margin-bottom: 24px;
                 display: flex; justify-content: space-between; align-items: center;
+                box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
             }
-            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-            .card { 
+            .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+            .kpi-card { 
                 background: white; padding: 20px; border-radius: 12px; 
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08); text-align: center;
+                border-left: 4px solid #667eea;
             }
+            .kpi-value { font-size: 28px; font-weight: bold; margin-bottom: 4px; }
+            .kpi-label { color: #64748b; font-size: 14px; font-weight: 500; }
+            .kpi-change { font-size: 12px; margin-top: 4px; }
+            .positive { color: #10b981; }
+            .negative { color: #ef4444; }
+            .neutral { color: #64748b; }
+            
+            .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+            .full-width { grid-column: 1 / -1; }
+            
+            .card { 
+                background: white; padding: 24px; border-radius: 12px; 
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            }
+            .card h3 { margin: 0 0 16px 0; color: #1e293b; font-size: 18px; font-weight: 600; }
+            
+            .chart-container { position: relative; height: 400px; margin: 16px 0; }
+            .chart-canvas { width: 100%; height: 100%; border-radius: 8px; }
+            
+            .filter-section {
+                background: white; padding: 16px; border-radius: 12px; margin-bottom: 24px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.08); display: flex; gap: 16px; align-items: center;
+            }
+            .filter-section select, .filter-section input {
+                padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+                font-size: 14px; min-width: 150px;
+            }
+            
             .btn { 
-                padding: 8px 16px; background: #667eea; color: white;
-                border: none; border-radius: 6px; cursor: pointer; text-decoration: none;
-                display: inline-block;
+                padding: 10px 20px; background: #667eea; color: white;
+                border: none; border-radius: 8px; cursor: pointer; text-decoration: none;
+                display: inline-block; font-weight: 500; transition: all 0.2s;
             }
-            .btn:hover { background: #5a6fd8; }
+            .btn:hover { background: #5a6fd8; transform: translateY(-1px); }
+            .btn-secondary { background: #64748b; }
+            .btn-secondary:hover { background: #475569; }
+            
+            .table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            .table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+            .table th { background: #f8fafc; font-weight: 600; color: #374151; }
+            .table tbody tr:hover { background: #f8fafc; }
+            
+            .category-item { 
+                display: flex; justify-content: space-between; align-items: center;
+                padding: 8px 0; border-bottom: 1px solid #f1f5f9;
+            }
+            .category-bar {
+                height: 6px; background: #e2e8f0; border-radius: 3px; margin: 4px 0;
+                position: relative; overflow: hidden;
+            }
+            .category-fill {
+                height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);
+                border-radius: 3px; transition: width 0.3s ease;
+            }
+            
+            .loading { text-align: center; padding: 40px; color: #64748b; }
+            .error { text-align: center; padding: 40px; color: #ef4444; }
         </style>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>📊 Mi Dashboard Personal</h1>
-                <a href="/multiuser/dashboard" class="btn">← Volver al Dashboard</a>
+                <div>
+                    <h1>📊 Dashboard Financiero</h1>
+                    <p id="accountName" style="margin: 4px 0; opacity: 0.9;">Cargando cuenta...</p>
+                </div>
+                <div>
+                    <a href="/multiuser/dashboard" class="btn btn-secondary">← Volver</a>
+                    <button onclick="exportData()" class="btn">📊 Exportar</button>
+                </div>
             </div>
 
-            <div class="grid">
-                <div class="card">
-                    <h3>🏠 Filtrar por Apartamento</h3>
-                    <select id="apartmentFilter" onchange="loadStats()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        <option value="">Todos mis apartamentos</option>
-                    </select>
-                </div>
+            <!-- Filtros -->
+            <div class="filter-section">
+                <label><strong>🏠 Apartamento:</strong></label>
+                <select id="apartmentFilter" onchange="loadAllData()">
+                    <option value="">Todos mis apartamentos</option>
+                </select>
                 
+                <label><strong>📅 Año:</strong></label>
+                <select id="yearFilter" onchange="loadAllData()">
+                    <option value="2025">2025</option>
+                    <option value="2024">2024</option>
+                    <option value="2023">2023</option>
+                </select>
+                
+                <button onclick="loadAllData()" class="btn">🔄 Actualizar</button>
+            </div>
+
+            <!-- KPIs Principales -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div id="totalIncome" class="kpi-value positive">€0.00</div>
+                    <div class="kpi-label">Ingresos Totales</div>
+                    <div id="incomeChange" class="kpi-change">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div id="totalExpenses" class="kpi-value negative">€0.00</div>
+                    <div class="kpi-label">Gastos Totales</div>
+                    <div id="expenseChange" class="kpi-change">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div id="netProfit" class="kpi-value neutral">€0.00</div>
+                    <div class="kpi-label">Beneficio Neto</div>
+                    <div id="profitChange" class="kpi-change">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div id="profitMargin" class="kpi-value neutral">0%</div>
+                    <div class="kpi-label">% Beneficio Neto</div>
+                    <div id="marginChange" class="kpi-change">-</div>
+                </div>
+            </div>
+
+            <!-- Gráficos Principales -->
+            <div class="main-grid">
                 <div class="card">
-                    <h3>📈 Resumen 2025</h3>
-                    <div id="stats">
-                        <div style="text-align: center; padding: 20px;">
-                            <div style="font-size: 24px; color: #4caf50; margin: 8px;">€0.00</div>
-                            <div style="color: #666;">Ingresos Totales</div>
-                            <div style="font-size: 24px; color: #f44336; margin: 8px;">€0.00</div>
-                            <div style="color: #666;">Gastos Totales</div>
-                            <div style="font-size: 24px; color: #2196f3; margin: 8px;">€0.00</div>
-                            <div style="color: #666;">Balance</div>
-                        </div>
+                    <h3>📈 Evolución Mensual de Ingresos y Gastos</h3>
+                    <div class="chart-container">
+                        <canvas id="monthlyChart" class="chart-canvas"></canvas>
                     </div>
                 </div>
                 
                 <div class="card">
-                    <h3>💸 Últimos Gastos</h3>
-                    <div id="expenses">
-                        <p style="text-align: center; color: #666; padding: 20px;">
-                            No hay gastos registrados aún.<br>
-                            <small>Usa el bot de Telegram para agregar gastos.</small>
-                        </p>
+                    <h3>🏷️ Gastos por Categoría</h3>
+                    <div id="categoryChart" class="chart-container">
+                        <canvas id="categoryCanvas" class="chart-canvas"></canvas>
                     </div>
+                </div>
+            </div>
+
+            <!-- Tablas Detalladas -->
+            <div class="main-grid">
+                <div class="card">
+                    <h3>💸 Historial de Gastos Recientes</h3>
+                    <div id="expensesTable" class="loading">Cargando gastos...</div>
                 </div>
                 
                 <div class="card">
-                    <h3>🤖 Bot de Telegram</h3>
-                    <p>Para agregar gastos automáticamente:</p>
-                    <ol>
-                        <li>Busca <strong>@UriApartment_Bot</strong></li>
-                        <li>Envía <code>/start</code></li>
-                        <li>Configura con <code>/usar TU_CODIGO</code></li>
-                        <li>¡Envía fotos de facturas!</li>
-                    </ol>
-                    <a href="https://t.me/UriApartment_Bot" target="_blank" class="btn">🤖 Abrir Bot</a>
+                    <h3>💰 Ingresos y Reservas</h3>
+                    <div id="incomesTable" class="loading">Cargando ingresos...</div>
                 </div>
+            </div>
+
+            <!-- Tabla Mensual Completa -->
+            <div class="card full-width">
+                <h3>📊 Resumen Mensual Detallado</h3>
+                <div id="monthlyTable" class="loading">Cargando tabla mensual...</div>
             </div>
         </div>
 
         <script>
             let token = localStorage.getItem('access_token');
             let accountId = localStorage.getItem('current_account_id');
+            let apartments = [];
+            let monthlyChart = null;
+            let categoryChart = null;
             
             async function loadUserData() {
-                if (!token) {
+                if (!token || !accountId) {
                     window.location.href = '/multiuser/login';
                     return;
                 }
                 
                 try {
+                    // Cargar información del usuario y cuenta
+                    const userResponse = await fetch('/api/v1/auth/me', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (userResponse.ok) {
+                        const userData = await userResponse.json();
+                        const currentAccount = userData.accounts.find(acc => acc.id === accountId);
+                        document.getElementById('accountName').textContent = currentAccount?.name || 'Mi Cuenta';
+                    }
+                    
                     // Cargar apartamentos
                     const response = await fetch('/api/v1/apartments/', {
                         headers: {
@@ -204,20 +310,21 @@ async def dashboard_personal_page(request: Request):
                     });
                     
                     if (response.ok) {
-                        const apartments = await response.json();
+                        apartments = await response.json();
                         updateApartmentFilter(apartments);
-                        loadStats();
+                        loadAllData();
                     } else {
-                        console.error('Error loading apartments');
+                        showError('Error cargando apartamentos');
                     }
                 } catch (error) {
                     console.error('Error:', error);
+                    showError('Error de conexión');
                 }
             }
             
             function updateApartmentFilter(apartments) {
                 const select = document.getElementById('apartmentFilter');
-                select.innerHTML = '<option value="">Todos mis apartamentos</option>';
+                select.innerHTML = '<option value="">Todos mis apartamentos (' + apartments.length + ')</option>';
                 
                 apartments.forEach(apt => {
                     const option = document.createElement('option');
@@ -227,46 +334,353 @@ async def dashboard_personal_page(request: Request):
                 });
             }
             
-            async function loadStats() {
+            async function loadAllData() {
                 const selectedApartment = document.getElementById('apartmentFilter').value;
+                const selectedYear = document.getElementById('yearFilter').value;
                 
                 try {
-                    let url = '/api/v1/dashboard/monthly?year=2025';
-                    if (selectedApartment) {
-                        url += `&apartment_code=${selectedApartment}`;
-                    }
+                    // Cargar datos mensuales
+                    await loadMonthlyData(selectedYear, selectedApartment);
                     
-                    const response = await fetch(url, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'X-Account-ID': accountId
-                        }
-                    });
+                    // Cargar estadísticas de resumen
+                    await loadSummaryStats(selectedYear, selectedApartment);
                     
-                    if (response.ok) {
-                        const data = await response.json();
-                        updateStats(data);
-                    }
+                    // Cargar gastos recientes
+                    await loadRecentExpenses(selectedApartment);
+                    
+                    // Cargar ingresos y reservas
+                    await loadIncomesData(selectedApartment);
+                    
                 } catch (error) {
-                    console.error('Error loading stats:', error);
+                    console.error('Error loading dashboard data:', error);
+                    showError('Error cargando datos del dashboard');
                 }
             }
             
-            function updateStats(data) {
-                const totalIncome = data.items.reduce((sum, item) => sum + item.incomes_accepted + item.incomes_pending, 0);
-                const totalExpenses = data.items.reduce((sum, item) => sum + item.expenses, 0);
-                const balance = totalIncome - totalExpenses;
+            async function loadMonthlyData(year, apartmentCode) {
+                let url = `/api/v1/dashboard/monthly?year=${year}`;
+                if (apartmentCode) {
+                    url += `&apartment_code=${apartmentCode}`;
+                }
                 
-                document.getElementById('stats').innerHTML = `
-                    <div style="text-align: center; padding: 20px;">
-                        <div style="font-size: 24px; color: #4caf50; margin: 8px;">€${totalIncome.toFixed(2)}</div>
-                        <div style="color: #666;">Ingresos Totales</div>
-                        <div style="font-size: 24px; color: #f44336; margin: 8px;">€${totalExpenses.toFixed(2)}</div>
-                        <div style="color: #666;">Gastos Totales</div>
-                        <div style="font-size: 24px; color: ${balance >= 0 ? '#4caf50' : '#f44336'}; margin: 8px;">€${balance.toFixed(2)}</div>
-                        <div style="color: #666;">Balance</div>
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-Account-ID': accountId
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateMonthlyChart(data);
+                    updateMonthlyTable(data);
+                } else {
+                    console.error('Error loading monthly data');
+                }
+            }
+            
+            async function loadSummaryStats(year, apartmentCode) {
+                let url = `/api/v1/dashboard/summary-stats?year=${year}`;
+                if (apartmentCode) {
+                    url += `&apartment_code=${apartmentCode}`;
+                }
+                
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-Account-ID': accountId
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateKPIs(data);
+                } else {
+                    console.error('Error loading summary stats');
+                }
+            }
+            
+            async function loadRecentExpenses(apartmentCode) {
+                let url = '/api/v1/dashboard/recent-expenses?limit=15';
+                if (apartmentCode) {
+                    url += `&apartment_code=${apartmentCode}`;
+                }
+                
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-Account-ID': accountId
+                    }
+                });
+                
+                if (response.ok) {
+                    const expenses = await response.json();
+                    updateExpensesTable(expenses);
+                    updateCategoryChart(expenses);
+                } else {
+                    document.getElementById('expensesTable').innerHTML = '<p class="error">Error cargando gastos</p>';
+                }
+            }
+            
+            async function loadIncomesData(apartmentCode) {
+                // Por ahora mostrar mensaje de desarrollo
+                document.getElementById('incomesTable').innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: #64748b;">
+                        <p><strong>💰 Ingresos y Reservas</strong></p>
+                        <p>Esta sección mostrará:</p>
+                        <ul style="text-align: left; max-width: 300px; margin: 16px auto;">
+                            <li>Reservas confirmadas y pendientes</li>
+                            <li>Ingresos por canal (Booking, Airbnb)</li>
+                            <li>Estado de pagos</li>
+                            <li>Próximos check-ins</li>
+                        </ul>
+                        <p><em>Funcionalidad en desarrollo</em></p>
                     </div>
                 `;
+            }
+            
+            function updateKPIs(data) {
+                document.getElementById('totalIncome').textContent = `€${data.total_income.toFixed(2)}`;
+                document.getElementById('totalExpenses').textContent = `€${data.total_expenses.toFixed(2)}`;
+                document.getElementById('netProfit').textContent = `€${data.net_profit.toFixed(2)}`;
+                document.getElementById('profitMargin').textContent = `${data.profit_margin.toFixed(1)}%`;
+                
+                // Cambios porcentuales
+                document.getElementById('incomeChange').innerHTML = `
+                    <span class="${data.income_change >= 0 ? 'positive' : 'negative'}">
+                        ${data.income_change >= 0 ? '+' : ''}${data.income_change.toFixed(1)}% vs año anterior
+                    </span>
+                `;
+                document.getElementById('expenseChange').innerHTML = `
+                    <span class="${data.expense_change <= 0 ? 'positive' : 'negative'}">
+                        ${data.expense_change >= 0 ? '+' : ''}${data.expense_change.toFixed(1)}% vs año anterior
+                    </span>
+                `;
+                document.getElementById('profitChange').innerHTML = `
+                    <span class="${data.net_change >= 0 ? 'positive' : 'negative'}">
+                        ${data.net_change >= 0 ? '+' : ''}${data.net_change.toFixed(1)}% vs año anterior
+                    </span>
+                `;
+                document.getElementById('marginChange').innerHTML = `
+                    <span class="neutral">
+                        Margen de beneficio
+                    </span>
+                `;
+            }
+            
+            function updateMonthlyChart(data) {
+                const ctx = document.getElementById('monthlyChart').getContext('2d');
+                
+                if (monthlyChart) {
+                    monthlyChart.destroy();
+                }
+                
+                const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                
+                monthlyChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: months,
+                        datasets: [
+                            {
+                                label: 'Ingresos Confirmados',
+                                data: data.items.map(item => item.incomes_accepted),
+                                backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                                borderColor: 'rgba(16, 185, 129, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Ingresos Pendientes',
+                                data: data.items.map(item => item.incomes_pending),
+                                backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Gastos',
+                                data: data.items.map(item => item.expenses),
+                                backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                                borderColor: 'rgba(239, 68, 68, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Evolución Mensual de Ingresos y Gastos'
+                            },
+                            legend: {
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '€' + value.toFixed(0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function updateCategoryChart(expenses) {
+                // Agrupar gastos por categoría
+                const categories = {};
+                expenses.forEach(expense => {
+                    const category = expense.category || 'Sin categoría';
+                    categories[category] = (categories[category] || 0) + expense.amount;
+                });
+                
+                const ctx = document.getElementById('categoryCanvas').getContext('2d');
+                
+                if (categoryChart) {
+                    categoryChart.destroy();
+                }
+                
+                const categoryNames = Object.keys(categories);
+                const categoryValues = Object.values(categories);
+                
+                if (categoryNames.length === 0) {
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = '#64748b';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('No hay gastos por categoría', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                    return;
+                }
+                
+                categoryChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: categoryNames,
+                        datasets: [{
+                            data: categoryValues,
+                            backgroundColor: [
+                                '#667eea', '#764ba2', '#f093fb', '#f5576c',
+                                '#4facfe', '#00f2fe', '#43e97b', '#38f9d7',
+                                '#ffecd2', '#fcb69f', '#a8edea', '#fed6e3'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Distribución de Gastos por Categoría'
+                            },
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function updateExpensesTable(expenses) {
+                if (expenses.length === 0) {
+                    document.getElementById('expensesTable').innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #64748b;">
+                            <p>No hay gastos registrados</p>
+                            <p><small>Usa el bot de Telegram para agregar gastos automáticamente</small></p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                document.getElementById('expensesTable').innerHTML = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Proveedor</th>
+                                <th>Categoría</th>
+                                <th>Apartamento</th>
+                                <th style="text-align: right;">Importe</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${expenses.slice(0, 10).map(expense => `
+                                <tr>
+                                    <td>${new Date(expense.date).toLocaleDateString('es-ES')}</td>
+                                    <td><strong>${expense.vendor || 'Sin proveedor'}</strong><br>
+                                        <small style="color: #64748b;">${expense.description || ''}</small></td>
+                                    <td><span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                                        ${expense.category || 'Sin categoría'}</span></td>
+                                    <td>${expense.apartment_code}</td>
+                                    <td style="text-align: right; font-weight: bold; color: #ef4444;">€${expense.amount.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    ${expenses.length > 10 ? `<p style="text-align: center; margin-top: 16px; color: #64748b;"><small>Mostrando 10 de ${expenses.length} gastos</small></p>` : ''}
+                `;
+            }
+            
+            function updateMonthlyTable(data) {
+                const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                               'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                
+                document.getElementById('monthlyTable').innerHTML = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Mes</th>
+                                <th style="text-align: right;">Ingresos Confirmados</th>
+                                <th style="text-align: right;">Ingresos Pendientes</th>
+                                <th style="text-align: right;">Total Ingresos</th>
+                                <th style="text-align: right;">Gastos</th>
+                                <th style="text-align: right;">Beneficio Neto</th>
+                                <th style="text-align: right;">% Margen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.items.map((item, index) => {
+                                const totalIncome = item.incomes_accepted + item.incomes_pending;
+                                const margin = totalIncome > 0 ? ((totalIncome - item.expenses) / totalIncome * 100) : 0;
+                                return `
+                                    <tr>
+                                        <td><strong>${months[index]}</strong></td>
+                                        <td style="text-align: right; color: #10b981;">€${item.incomes_accepted.toFixed(2)}</td>
+                                        <td style="text-align: right; color: #3b82f6;">€${item.incomes_pending.toFixed(2)}</td>
+                                        <td style="text-align: right; font-weight: bold;">€${totalIncome.toFixed(2)}</td>
+                                        <td style="text-align: right; color: #ef4444;">€${item.expenses.toFixed(2)}</td>
+                                        <td style="text-align: right; font-weight: bold; color: ${item.net >= 0 ? '#10b981' : '#ef4444'};">€${item.net.toFixed(2)}</td>
+                                        <td style="text-align: right; color: ${margin >= 0 ? '#10b981' : '#ef4444'};">${margin.toFixed(1)}%</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            
+            function showError(message) {
+                document.getElementById('expensesTable').innerHTML = `<p class="error">${message}</p>`;
+                document.getElementById('incomesTable').innerHTML = `<p class="error">${message}</p>`;
+                document.getElementById('monthlyTable').innerHTML = `<p class="error">${message}</p>`;
+            }
+            
+            function exportData() {
+                alert(`📊 Exportar Datos
+
+Funcionalidades disponibles:
+• 📄 Exportar a Excel
+• 📋 Exportar a PDF
+• 📊 Reportes personalizados
+• 📈 Gráficos para presentaciones
+
+Esta funcionalidad se implementará próximamente.`);
             }
             
             // Inicializar
