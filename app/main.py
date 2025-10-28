@@ -456,6 +456,69 @@ def debug_test_login(credentials: dict):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.get("/debug-postgres")
+def debug_postgres_simple():
+    """Diagnóstico simple de PostgreSQL - disponible inmediatamente"""
+    import os
+    import sys
+    
+    # Información básica
+    database_url = os.getenv("DATABASE_URL", "No configurada")
+    
+    # Información del entorno
+    debug_info = {
+        "database_url_exists": bool(os.getenv("DATABASE_URL")),
+        "database_url_preview": database_url.replace(database_url.split('@')[0].split(':')[-1], "***") if '@' in database_url else database_url,
+        "contains_postgresql": "postgresql" in database_url if database_url else False,
+        "python_version": sys.version.split()[0],
+    }
+    
+    # Intentar importar psycopg
+    try:
+        import psycopg
+        debug_info["psycopg_version"] = psycopg.__version__
+        debug_info["psycopg_available"] = True
+    except ImportError as e:
+        debug_info["psycopg_available"] = False
+        debug_info["psycopg_error"] = str(e)
+    
+    # Verificar SQLAlchemy
+    try:
+        import sqlalchemy
+        debug_info["sqlalchemy_version"] = sqlalchemy.__version__
+    except ImportError:
+        debug_info["sqlalchemy_version"] = "No disponible"
+    
+    # Estado actual del engine
+    try:
+        from .db import engine
+        debug_info["current_engine_url"] = str(engine.url).replace(str(engine.url).split('@')[0].split(':')[-1], "***") if '@' in str(engine.url) else str(engine.url)
+        debug_info["using_sqlite"] = "sqlite" in str(engine.url)
+        debug_info["using_postgresql"] = "postgresql" in str(engine.url)
+    except Exception as e:
+        debug_info["engine_error"] = str(e)
+    
+    # Test de conexión simple
+    if debug_info.get("psycopg_available") and database_url and "postgresql" in database_url:
+        try:
+            import psycopg
+            # Intentar conexión básica
+            conn_params = psycopg.conninfo.conninfo_to_dict(database_url)
+            debug_info["connection_params"] = {k: "***" if k in ["password"] else v for k, v in conn_params.items()}
+            
+            # Test de conexión
+            with psycopg.connect(database_url, connect_timeout=5) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                    result = cur.fetchone()
+                    debug_info["direct_connection_test"] = "SUCCESS" if result else "FAILED"
+        except Exception as conn_error:
+            debug_info["direct_connection_test"] = "FAILED"
+            debug_info["connection_error"] = str(conn_error)
+            debug_info["connection_error_type"] = type(conn_error).__name__
+    
+    return debug_info
+
 # Crear/migrar tablas al arrancar
 @app.on_event("startup")
 def on_startup() -> None:
