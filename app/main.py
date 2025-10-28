@@ -158,6 +158,38 @@ app = FastAPI(title="SES.GASTOS")
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+@app.get("/debug/database-status")
+def database_status():
+    """Verificar estado de la base de datos"""
+    try:
+        from .db import DATABASE_URL, engine
+        import os
+        
+        # Información de la base de datos
+        db_info = {
+            "database_url": str(engine.url).replace(str(engine.url).split('@')[0].split(':')[-1], "***") if '@' in str(engine.url) else str(engine.url),
+            "database_type": "PostgreSQL" if "postgresql" in str(engine.url) else "SQLite",
+            "is_temporary": "/tmp/" in str(engine.url),
+            "persistence": "❌ TEMPORAL (se pierde en despliegues)" if "/tmp/" in str(engine.url) else "✅ PERSISTENTE"
+        }
+        
+        # Variables de entorno disponibles
+        env_vars = {
+            "DATABASE_URL": "✅" if os.getenv("DATABASE_URL") else "❌",
+            "DATABASE_PRIVATE_URL": "✅" if os.getenv("DATABASE_PRIVATE_URL") else "❌", 
+            "POSTGRES_URL": "✅" if os.getenv("POSTGRES_URL") else "❌"
+        }
+        
+        return {
+            "success": True,
+            "database_info": db_info,
+            "environment_variables": env_vars,
+            "recommendation": "Configurar PostgreSQL en Render para persistencia" if db_info["is_temporary"] else "Base de datos configurada correctamente"
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.post("/debug/create-test-user")
 def create_test_user(db: Session = Depends(get_db)):
     """Crear usuario de prueba para testing con SQLite"""
