@@ -1152,9 +1152,13 @@ Por ahora usa el Dashboard Completo.`);
 
             // ========== FUNCIONES DEL CHAT INTEGRADO ==========
             
+            let chatActiveApartment = null;
+            let chatApartments = [];
+            
             function openChat() {
                 document.getElementById('chatModal').style.display = 'block';
                 document.body.style.overflow = 'hidden';
+                loadChatApartments();
             }
             
             function closeChat() {
@@ -1192,6 +1196,17 @@ Por ahora usa el Dashboard Completo.`);
                 
                 if (!message) return;
                 
+                // Verificar que hay apartamento seleccionado para gastos
+                const isExpenseMessage = message.includes('€') || message.includes('eur') || 
+                                       message.toLowerCase().includes('gasto') || 
+                                       message.toLowerCase().includes('pagué') ||
+                                       message.toLowerCase().includes('compré');
+                
+                if (isExpenseMessage && !chatActiveApartment) {
+                    alert('❌ Primero selecciona un apartamento para registrar gastos');
+                    return;
+                }
+                
                 // Agregar mensaje del usuario
                 addChatMessage(message, 'user');
                 input.value = '';
@@ -1210,7 +1225,8 @@ Por ahora usa el Dashboard Completo.`);
                         },
                         body: JSON.stringify({
                             message: message,
-                            context: 'dashboard'
+                            context: 'dashboard',
+                            apartment_code: chatActiveApartment ? chatActiveApartment.code : null
                         })
                     });
                     
@@ -1284,32 +1300,95 @@ Por ahora usa el Dashboard Completo.`);
                 }
             }
             
-            async function handleImageUpload(event) {
+            async function loadChatApartments() {
+                try {
+                    const response = await fetch('/api/v1/apartments/', {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                            'X-Account-ID': currentAccountId
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        chatApartments = await response.json();
+                        updateChatApartmentSelector();
+                        
+                        // Auto-seleccionar el primer apartamento si solo hay uno
+                        if (chatApartments.length === 1) {
+                            chatActiveApartment = chatApartments[0];
+                            document.getElementById('chatApartmentSelect').value = chatActiveApartment.code;
+                            addChatMessage(`✅ Apartamento seleccionado: **${chatActiveApartment.code}** - ${chatActiveApartment.name}\\n\\n¡Ahora puedes enviar facturas o escribir gastos!`, 'assistant');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading chat apartments:', error);
+                }
+            }
+            
+            function updateChatApartmentSelector() {
+                const select = document.getElementById('chatApartmentSelect');
+                select.innerHTML = '<option value="">Selecciona un apartamento...</option>';
+                
+                chatApartments.forEach(apt => {
+                    const option = document.createElement('option');
+                    option.value = apt.code;
+                    option.textContent = `${apt.code} - ${apt.name}`;
+                    select.appendChild(option);
+                });
+            }
+            
+            function changeActiveApartment() {
+                const select = document.getElementById('chatApartmentSelect');
+                const selectedCode = select.value;
+                
+                if (selectedCode) {
+                    chatActiveApartment = chatApartments.find(apt => apt.code === selectedCode);
+                    addChatMessage(`🏠 Apartamento cambiado a: **${chatActiveApartment.code}** - ${chatActiveApartment.name}\\n\\n¡Listo para procesar facturas!`, 'assistant');
+                } else {
+                    chatActiveApartment = null;
+                }
+            }
+
+            async function handleFileUpload(event) {
                 const file = event.target.files[0];
                 if (!file) return;
                 
+                // Verificar que hay apartamento seleccionado
+                if (!chatActiveApartment) {
+                    alert('❌ Primero selecciona un apartamento');
+                    event.target.value = '';
+                    return;
+                }
+                
                 // Validar tipo de archivo
-                if (!file.type.startsWith('image/')) {
-                    alert('❌ Solo se permiten archivos de imagen');
+                const isImage = file.type.startsWith('image/');
+                const isPDF = file.type === 'application/pdf';
+                
+                if (!isImage && !isPDF) {
+                    alert('❌ Solo se permiten imágenes (JPG, PNG) y archivos PDF');
+                    event.target.value = '';
                     return;
                 }
                 
                 // Validar tamaño (máximo 10MB)
                 if (file.size > 10 * 1024 * 1024) {
-                    alert('❌ La imagen es muy grande. Máximo 10MB');
+                    alert('❌ El archivo es muy grande. Máximo 10MB');
+                    event.target.value = '';
                     return;
                 }
                 
-                addChatMessage('📸 Procesando imagen...', 'user');
+                const fileType = isPDF ? 'PDF' : 'imagen';
+                addChatMessage(`📄 Procesando ${fileType}...`, 'user');
                 addTypingIndicator();
                 
                 try {
-                    // Crear FormData para subir la imagen
+                    // Crear FormData para subir el archivo
                     const formData = new FormData();
-                    formData.append('image', file);
+                    formData.append('file', file);
+                    formData.append('apartment_code', chatActiveApartment.code);
                     formData.append('context', 'dashboard');
                     
-                    const response = await fetch('/api/v1/chat/image', {
+                    const response = await fetch('/api/v1/chat/file', {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -1331,11 +1410,11 @@ Por ahora usa el Dashboard Completo.`);
                             }, 1000);
                         }
                     } else {
-                        addChatMessage('❌ Error procesando la imagen. Inténtalo de nuevo.', 'assistant');
+                        addChatMessage(`❌ Error procesando el ${fileType}. Inténtalo de nuevo.`, 'assistant');
                     }
                 } catch (error) {
                     removeTypingIndicator();
-                    addChatMessage('❌ Error subiendo la imagen. Verifica tu conexión.', 'assistant');
+                    addChatMessage(`❌ Error subiendo el ${fileType}. Verifica tu conexión.`, 'assistant');
                 }
                 
                 // Limpiar input
@@ -1361,20 +1440,37 @@ Por ahora usa el Dashboard Completo.`);
                 <!-- Área de mensajes -->
                 <div id="chatMessages" style="flex: 1; padding: 20px; overflow-y: auto; background: #f8fafc;">
                     <div class="chat-message assistant" style="margin-bottom: 16px;">
-                        <div style="background: #667eea; color: white; padding: 12px 16px; border-radius: 18px 18px 18px 4px; max-width: 80%; display: inline-block;">
-                            ¡Hola! 👋 Soy tu asistente virtual para gestionar gastos.<br><br>
-                            <strong>¿Qué puedo hacer por ti?</strong><br>
-                            • 📸 Procesar fotos de facturas<br>
-                            • ✍️ Registrar gastos escritos<br>
-                            • 🏠 Gestionar apartamentos<br>
-                            • 📊 Mostrar estadísticas<br><br>
-                            <em>Escribe un gasto o sube una foto para empezar</em>
+                        <div style="background: #667eea; color: white; padding: 16px 20px; border-radius: 18px 18px 18px 4px; max-width: 85%; display: inline-block; line-height: 1.5;">
+                            ¡Hola! 👋<br><br>
+                            🤖 <strong>Asistente SES.GASTOS con IA + OCR</strong><br><br>
+                            📋 <strong>Pasos para usar:</strong><br>
+                            1️⃣ Selecciona tu apartamento<br>
+                            2️⃣ <strong>Envía factura:</strong><br>
+                            &nbsp;&nbsp;&nbsp;📸 <strong>Foto de factura</strong> → IA automática<br>
+                            &nbsp;&nbsp;&nbsp;📄 <strong>PDF de factura</strong> → OCR completo<br>
+                            &nbsp;&nbsp;&nbsp;📝 <strong>Datos manuales</strong> → Escribir gasto<br><br>
+                            🤖 <strong>Procesamiento Automático:</strong><br>
+                            • 📅 Fecha de la factura<br>
+                            • 💰 Importe total<br>
+                            • 🏪 Proveedor/Empresa<br>
+                            • 📂 Categoría del gasto<br>
+                            • 🧾 Número de factura<br><br>
+                            💡 <strong>Tip:</strong> Las fotos deben ser claras y los PDFs legibles.<br><br>
+                            <em>¿Con qué apartamento quieres trabajar?</em>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Input del Chat -->
                 <div style="padding: 20px; border-top: 1px solid #e2e8f0; background: white; border-radius: 0 0 12px 12px;">
+                    <!-- Selector de Apartamento -->
+                    <div id="apartmentSelector" style="margin-bottom: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <label style="font-weight: 500; color: #374151; margin-bottom: 8px; display: block;">🏠 Apartamento activo:</label>
+                        <select id="chatApartmentSelect" onchange="changeActiveApartment()" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                            <option value="">Selecciona un apartamento...</option>
+                        </select>
+                    </div>
+                    
                     <div style="display: flex; gap: 12px; align-items: end;">
                         <div style="flex: 1;">
                             <textarea id="chatInput" placeholder="Escribe un gasto: 'Restaurante La Marina, 35€, cena' o haz una pregunta..." 
@@ -1385,10 +1481,10 @@ Por ahora usa el Dashboard Completo.`);
                             <button onclick="sendMessage()" style="background: #667eea; color: white; border: none; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-weight: 500;">
                                 Enviar
                             </button>
-                            <label for="imageUpload" style="background: #10b981; color: white; border: none; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-weight: 500; text-align: center; font-size: 14px;">
-                                📸 Foto
+                            <label for="fileUpload" style="background: #10b981; color: white; border: none; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-weight: 500; text-align: center; font-size: 14px;">
+                                📄 Archivo
                             </label>
-                            <input type="file" id="imageUpload" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+                            <input type="file" id="fileUpload" accept="image/*,.pdf" style="display: none;" onchange="handleFileUpload(event)">
                         </div>
                     </div>
                 </div>

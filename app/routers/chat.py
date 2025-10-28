@@ -44,6 +44,7 @@ async def chat_message(
     
     message = request_data.get("message", "").strip()
     context = request_data.get("context", "dashboard")
+    apartment_code = request_data.get("apartment_code")  # Apartamento seleccionado
     
     if not message:
         raise HTTPException(status_code=400, detail="Mensaje vacío")
@@ -63,8 +64,13 @@ async def chat_message(
                 "action": "no_apartments"
             }
         
-        # Usar el primer apartamento activo como predeterminado
-        default_apartment = apartments[0]
+        # Buscar apartamento específico si se proporciona
+        selected_apartment = None
+        if apartment_code:
+            selected_apartment = next((apt for apt in apartments if apt.code == apartment_code), None)
+        
+        # Usar apartamento seleccionado o el primero como predeterminado
+        default_apartment = selected_apartment or apartments[0]
         
         # Detectar tipo de mensaje
         response_data = await process_chat_message(
@@ -83,73 +89,86 @@ async def chat_message(
             "action": "error"
         }
 
-@router.post("/image")
-async def chat_image(
-    image: UploadFile = File(...),
+@router.post("/file")
+async def chat_file(
+    file: UploadFile = File(...),
+    apartment_code: str = Form(...),
     context: str = Form("dashboard"),
     current_account: models.Account = Depends(get_current_account),
     membership: models.AccountUser = Depends(require_member_or_above),
     db: Session = Depends(get_db)
 ):
-    """Procesar imagen con OCR + IA"""
+    """Procesar archivo (imagen o PDF) con OCR + IA"""
     
     try:
         # Validar tipo de archivo
-        if not image.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos de imagen")
+        is_image = file.content_type.startswith('image/')
+        is_pdf = file.content_type == 'application/pdf'
         
-        # Obtener apartamentos de la cuenta
-        apartments = db.query(models.Apartment).filter(
+        if not is_image and not is_pdf:
+            raise HTTPException(status_code=400, detail="Solo se permiten imágenes y archivos PDF")
+        
+        # Buscar apartamento específico por código
+        apartment = db.query(models.Apartment).filter(
             and_(
+                models.Apartment.code == apartment_code,
                 models.Apartment.account_id == current_account.id,
                 models.Apartment.is_active == True
             )
-        ).all()
+        ).first()
         
-        if not apartments:
+        if not apartment:
             return {
-                "response": "❌ No tienes apartamentos registrados. Crea uno primero para poder procesar facturas.",
-                "action": "no_apartments"
+                "response": f"❌ Apartamento '{apartment_code}' no encontrado en tu cuenta.",
+                "action": "apartment_not_found"
             }
         
-        # Usar el primer apartamento activo como predeterminado
-        default_apartment = apartments[0]
-        
-        # Guardar imagen temporalmente
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
-            content = await image.read()
+        # Guardar archivo temporalmente
+        file_suffix = ".pdf" if is_pdf else ".jpg"
+        with tempfile.NamedTemporaryFile(suffix=file_suffix, delete=False) as tmp_file:
+            content = await file.read()
             tmp_file.write(content)
             tmp_file.flush()
             
-            # Extraer texto con OCR
-            ocr_text = extract_text_from_image(tmp_file.name)
+            # Extraer texto con OCR (funciona para imágenes y PDFs)
+            if is_pdf:
+                try:
+                    from ..bot.Ocr_untils import extract_text_from_pdf
+                    ocr_text = extract_text_from_pdf(tmp_file.name)
+                except ImportError:
+                    ocr_text = extract_text_from_image(tmp_file.name)  # Fallback
+            else:
+                ocr_text = extract_text_from_image(tmp_file.name)
             
             if not ocr_text:
+                file_type = "PDF" if is_pdf else "imagen"
                 return {
-                    "response": "❌ No pude extraer texto de la imagen. Asegúrate de que sea clara y legible.",
+                    "response": f"❌ No pude extraer texto del {file_type}. Asegúrate de que sea claro y legible.",
                     "action": "ocr_failed"
                 }
             
             # Procesar con IA
-            expense_data = extract_expense_json(ocr_text, default_apartment.code)
+            expense_data = extract_expense_json(ocr_text, apartment.code)
             
             if not expense_data or not expense_data.get("amount_gross"):
+                file_type = "PDF" if is_pdf else "imagen"
                 return {
-                    "response": f"❌ No pude extraer datos de gasto de la imagen.\n\n📝 **Texto extraído:**\n{ocr_text[:300]}...\n\n💡 Puedes escribir el gasto manualmente.",
+                    "response": f"❌ No pude extraer datos de gasto del {file_type}.\n\n📝 **Texto extraído:**\n{ocr_text[:300]}...\n\n💡 Puedes escribir el gasto manualmente.",
                     "action": "extraction_failed"
                 }
             
             # Crear gasto
             success, response_message = await create_expense_from_data(
                 expense_data, 
-                default_apartment, 
+                apartment, 
                 current_account, 
                 db
             )
             
             if success:
+                file_type = "PDF" if is_pdf else "factura"
                 return {
-                    "response": f"✅ **¡Factura procesada exitosamente!**\n\n🏠 **Apartamento:** {default_apartment.code}\n💰 **Importe:** €{expense_data.get('amount_gross', 0)}\n🏪 **Proveedor:** {expense_data.get('vendor', 'Sin proveedor')}\n📂 **Categoría:** {expense_data.get('category', 'Sin categoría')}\n\n🤖 **Procesado automáticamente con IA**",
+                    "response": f"✅ **¡{file_type.title()} procesado exitosamente!**\n\n🏠 **Apartamento:** {apartment.code} - {apartment.name}\n💰 **Importe:** €{expense_data.get('amount_gross', 0)}\n📅 **Fecha:** {expense_data.get('date', 'Hoy')}\n🏪 **Proveedor:** {expense_data.get('vendor', 'Sin proveedor')}\n📂 **Categoría:** {expense_data.get('category', 'Sin categoría')}\n🧾 **Factura:** {expense_data.get('invoice_number', 'Sin número')}\n\n🤖 **Procesado automáticamente con IA + OCR**",
                     "action": "expense_created",
                     "expense_data": expense_data
                 }
