@@ -1,12 +1,15 @@
-﻿# Python
+# Python
 __pycache__/
 *.pyc
 .venv/
 .env
 
-# Local DB / artefactos
-local.db
+# Local DB / artefactos (SQLite ya no se usa - solo PostgreSQL)
+*.db
+*.sqlite
 *.sqlite3
+local.db
+test_*.db
 
 # Editor/OS
 .vscode/
