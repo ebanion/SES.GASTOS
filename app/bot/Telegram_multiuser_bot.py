@@ -467,7 +467,7 @@ async def process_manual_expense(update: Update, context: ContextTypes.DEFAULT_T
     
     try:
         # Usar IA para extraer datos del texto
-        expense_json = extract_expense_json(text)
+        expense_json = extract_expense_json(text, apartment_code)
         
         if not expense_json:
             await update.message.reply_text(
@@ -563,7 +563,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 return
             
             # Procesar con IA
-            expense_json = extract_expense_json(ocr_text)
+            expense_json = extract_expense_json(ocr_text, selected_apartment)
             
             if not expense_json:
                 await update.message.reply_text(

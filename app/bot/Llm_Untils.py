@@ -81,4 +81,10 @@ Devuelve un JSON con esta forma (solo claves con datos):
     data.setdefault("currency", "EUR")
     data.setdefault("source", "telegram_bot")
     data.setdefault("status", "PENDING")
+    
+    # Agregar fecha actual si no se proporcionó
+    if not data.get("date"):
+        from datetime import date
+        data["date"] = date.today().isoformat()
+    
     return data
