@@ -372,75 +372,123 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
             }
 
             function openFullDashboard() {
-                // Crear dashboard integrado en la misma página
+                // Redirigir al dashboard personal del anfitrión con autenticación
+                const token = localStorage.getItem('access_token');
                 const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
                 
-                // Mostrar dashboard financiero integrado
+                if (!token || !currentAccountId) {
+                    alert('❌ Error de autenticación. Por favor, inicia sesión nuevamente.');
+                    window.location.href = '/multiuser/login';
+                    return;
+                }
+                
+                // Crear URL con parámetros de autenticación
+                const dashboardUrl = `/api/v1/dashboard/?token=${encodeURIComponent(token)}&account_id=${encodeURIComponent(currentAccountId)}`;
+                
+                // Abrir en la misma ventana para mantener la sesión
+                window.location.href = dashboardUrl;
+                
+                // Alternativa: Mostrar dashboard simplificado inline
+                showSimpleDashboard();
+            }
+            
+            function showSimpleDashboard() {
+                const currentAccount = accountsData.find(acc => acc.id === currentAccountId);
+                
                 document.getElementById('dashboardContent').innerHTML = `
                     <div class="welcome-message">
-                        <h2>📊 Dashboard Financiero - ${currentAccount?.name}</h2>
-                        <button onclick="loadUserData()" class="btn" style="background: #667eea; color: white;">← Volver al Dashboard Principal</button>
+                        <h2>📊 Dashboard Personal - ${currentAccount?.name}</h2>
+                        <button onclick="loadUserData()" class="btn" style="background: #667eea; color: white;">← Volver</button>
                     </div>
                     
                     <div class="grid">
                         <div class="card">
-                            <h3>📈 Resumen del Año 2025</h3>
-                            <div id="yearlyStats">Cargando estadísticas...</div>
-                        </div>
-                        
-                        <div class="card">
                             <h3>🏠 Filtrar por Apartamento</h3>
-                            <select id="apartmentFilter" onchange="filterByApartment()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="">Todos los apartamentos</option>
+                            <select id="apartmentFilter" onchange="loadDashboardStats()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="">Todos mis apartamentos</option>
                                 ${apartments.map(apt => `<option value="${apt.code}">${apt.code} - ${apt.name}</option>`).join('')}
                             </select>
                         </div>
                         
-                        <div class="card" style="grid-column: 1 / -1;">
-                            <h3>📊 Gráfico Mensual</h3>
-                            <div id="monthlyChart">
-                                <canvas id="chartCanvas" width="800" height="400" style="max-width: 100%; border: 1px solid #eee;"></canvas>
+                        <div class="card">
+                            <h3>📈 Resumen 2025</h3>
+                            <div id="dashboardStats">
+                                <div style="text-align: center; padding: 20px;">
+                                    <div style="font-size: 24px; color: #4caf50; margin: 8px;">€0.00</div>
+                                    <div style="color: #666;">Ingresos Totales</div>
+                                    <div style="font-size: 24px; color: #f44336; margin: 8px;">€0.00</div>
+                                    <div style="color: #666;">Gastos Totales</div>
+                                    <div style="font-size: 24px; color: #2196f3; margin: 8px;">€0.00</div>
+                                    <div style="color: #666;">Balance</div>
+                                </div>
                             </div>
                         </div>
                         
                         <div class="card">
-                            <h3>💸 Gastos Recientes</h3>
-                            <div id="recentExpenses">Cargando gastos...</div>
+                            <h3>💸 Últimos Gastos</h3>
+                            <div id="recentExpenses">
+                                <p style="text-align: center; color: #666; padding: 20px;">
+                                    No hay gastos registrados aún.<br>
+                                    <small>Usa el bot de Telegram para agregar gastos automáticamente.</small>
+                                </p>
+                            </div>
                         </div>
                         
                         <div class="card">
-                            <h3>💰 Ingresos Recientes</h3>
-                            <div id="recentIncomes">Cargando ingresos...</div>
+                            <h3>🤖 Instrucciones del Bot</h3>
+                            <div style="padding: 16px; background: #f8f9fa; border-radius: 8px; margin-top: 12px;">
+                                <p><strong>Para agregar gastos automáticamente:</strong></p>
+                                <ol style="margin: 8px 0; padding-left: 20px;">
+                                    <li>Busca <strong>@UriApartment_Bot</strong> en Telegram</li>
+                                    <li>Envía <code>/start</code></li>
+                                    <li>Configura con <code>/usar ${apartments.length > 0 ? apartments[0].code : 'TU_CODIGO'}</code></li>
+                                    <li>¡Envía fotos de facturas!</li>
+                                </ol>
+                                <a href="https://t.me/UriApartment_Bot" target="_blank" class="btn" 
+                                   style="background: #0088cc; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; display: inline-block; margin-top: 8px;">
+                                    🤖 Abrir Bot
+                                </a>
+                            </div>
                         </div>
                     </div>
                 `;
                 
-                // Cargar datos del dashboard
-                loadDashboardData();
+                // Cargar estadísticas reales
+                loadDashboardStats();
             }
             
-            async function loadDashboardData() {
+            async function loadDashboardStats() {
                 const token = localStorage.getItem('access_token');
+                const selectedApartment = document.getElementById('apartmentFilter')?.value || '';
                 
                 try {
-                    // Cargar datos mensuales
-                    const monthlyResponse = await fetch('/api/v1/dashboard/monthly?year=2025', {
+                    // Cargar datos del año actual
+                    const year = new Date().getFullYear();
+                    let url = `/api/v1/dashboard/monthly?year=${year}`;
+                    if (selectedApartment) {
+                        url += `&apartment_code=${selectedApartment}`;
+                    }
+                    
+                    const response = await fetch(url, {
                         headers: {
                             'Authorization': `Bearer ${token}`,
                             'X-Account-ID': currentAccountId
                         }
                     });
                     
-                    if (monthlyResponse.ok) {
-                        const monthlyData = await monthlyResponse.json();
-                        displayMonthlyChart(monthlyData);
-                        displayYearlyStats(monthlyData);
+                    if (response.ok) {
+                        const data = await response.json();
+                        updateDashboardStats(data);
                     } else {
-                        document.getElementById('yearlyStats').innerHTML = '<p style="color: #f44336;">Error cargando estadísticas</p>';
+                        console.error('Error loading dashboard stats:', response.status);
                     }
                     
                     // Cargar gastos recientes
-                    const expensesResponse = await fetch('/api/v1/dashboard/recent-expenses', {
+                    const expensesUrl = selectedApartment 
+                        ? `/api/v1/dashboard/recent-expenses?apartment_code=${selectedApartment}`
+                        : '/api/v1/dashboard/recent-expenses';
+                        
+                    const expensesResponse = await fetch(expensesUrl, {
                         headers: {
                             'Authorization': `Bearer ${token}`,
                             'X-Account-ID': currentAccountId
@@ -449,115 +497,39 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
                     
                     if (expensesResponse.ok) {
                         const expenses = await expensesResponse.json();
-                        displayRecentExpenses(expenses);
-                    } else {
-                        document.getElementById('recentExpenses').innerHTML = '<p>No hay gastos recientes</p>';
+                        updateRecentExpenses(expenses);
                     }
                     
                 } catch (error) {
                     console.error('Error loading dashboard data:', error);
-                    document.getElementById('yearlyStats').innerHTML = '<p style="color: #f44336;">Error de conexión</p>';
                 }
             }
             
-            function displayYearlyStats(data) {
+            function updateDashboardStats(data) {
                 const totalIncome = data.items.reduce((sum, item) => sum + item.incomes_accepted + item.incomes_pending, 0);
                 const totalExpenses = data.items.reduce((sum, item) => sum + item.expenses, 0);
-                const netProfit = totalIncome - totalExpenses;
+                const balance = totalIncome - totalExpenses;
                 
-                document.getElementById('yearlyStats').innerHTML = `
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; text-align: center;">
-                        <div>
-                            <div style="font-size: 24px; font-weight: bold; color: #4caf50;">€${totalIncome.toFixed(2)}</div>
-                            <div style="color: #666; font-size: 14px;">Ingresos Totales</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 24px; font-weight: bold; color: #f44336;">€${totalExpenses.toFixed(2)}</div>
-                            <div style="color: #666; font-size: 14px;">Gastos Totales</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 24px; font-weight: bold; color: ${netProfit >= 0 ? '#4caf50' : '#f44336'};">€${netProfit.toFixed(2)}</div>
-                            <div style="color: #666; font-size: 14px;">Beneficio Neto</div>
-                        </div>
+                document.getElementById('dashboardStats').innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 24px; color: #4caf50; margin: 8px;">€${totalIncome.toFixed(2)}</div>
+                        <div style="color: #666;">Ingresos Totales</div>
+                        <div style="font-size: 24px; color: #f44336; margin: 8px;">€${totalExpenses.toFixed(2)}</div>
+                        <div style="color: #666;">Gastos Totales</div>
+                        <div style="font-size: 24px; color: ${balance >= 0 ? '#4caf50' : '#f44336'}; margin: 8px;">€${balance.toFixed(2)}</div>
+                        <div style="color: #666;">Balance</div>
                     </div>
                 `;
             }
             
-            function displayMonthlyChart(data) {
-                const canvas = document.getElementById('chartCanvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Limpiar canvas
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                // Configuración del gráfico
-                const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                const padding = 60;
-                const chartWidth = canvas.width - 2 * padding;
-                const chartHeight = canvas.height - 2 * padding;
-                
-                // Encontrar valores máximos
-                const maxValue = Math.max(
-                    ...data.items.map(item => Math.max(item.incomes_accepted + item.incomes_pending, item.expenses))
-                );
-                
-                if (maxValue === 0) {
-                    ctx.fillStyle = '#666';
-                    ctx.font = '16px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('No hay datos para mostrar', canvas.width / 2, canvas.height / 2);
-                    return;
-                }
-                
-                // Dibujar ejes
-                ctx.strokeStyle = '#ddd';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(padding, padding);
-                ctx.lineTo(padding, canvas.height - padding);
-                ctx.lineTo(canvas.width - padding, canvas.height - padding);
-                ctx.stroke();
-                
-                // Dibujar datos
-                const barWidth = chartWidth / 12;
-                
-                data.items.forEach((item, index) => {
-                    const x = padding + index * barWidth + barWidth * 0.1;
-                    const incomeHeight = (item.incomes_accepted + item.incomes_pending) / maxValue * chartHeight;
-                    const expenseHeight = item.expenses / maxValue * chartHeight;
-                    
-                    // Barra de ingresos (verde)
-                    ctx.fillStyle = '#4caf50';
-                    ctx.fillRect(x, canvas.height - padding - incomeHeight, barWidth * 0.35, incomeHeight);
-                    
-                    // Barra de gastos (rojo)
-                    ctx.fillStyle = '#f44336';
-                    ctx.fillRect(x + barWidth * 0.4, canvas.height - padding - expenseHeight, barWidth * 0.35, expenseHeight);
-                    
-                    // Etiquetas de meses
-                    ctx.fillStyle = '#666';
-                    ctx.font = '12px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(months[index], x + barWidth * 0.4, canvas.height - padding + 20);
-                });
-                
-                // Leyenda
-                ctx.fillStyle = '#4caf50';
-                ctx.fillRect(padding, 20, 15, 15);
-                ctx.fillStyle = '#666';
-                ctx.font = '14px Arial';
-                ctx.textAlign = 'left';
-                ctx.fillText('Ingresos', padding + 20, 32);
-                
-                ctx.fillStyle = '#f44336';
-                ctx.fillRect(padding + 100, 20, 15, 15);
-                ctx.fillStyle = '#666';
-                ctx.fillText('Gastos', padding + 120, 32);
-            }
-            
-            function displayRecentExpenses(expenses) {
+            function updateRecentExpenses(expenses) {
                 if (expenses.length === 0) {
-                    document.getElementById('recentExpenses').innerHTML = '<p>No hay gastos recientes</p>';
+                    document.getElementById('recentExpenses').innerHTML = `
+                        <p style="text-align: center; color: #666; padding: 20px;">
+                            No hay gastos registrados aún.<br>
+                            <small>Usa el bot de Telegram para agregar gastos automáticamente.</small>
+                        </p>
+                    `;
                     return;
                 }
                 
@@ -572,32 +544,6 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
                         </div>
                     </div>
                 `).join('');
-            }
-            
-            async function filterByApartment() {
-                const selectedApartment = document.getElementById('apartmentFilter').value;
-                const token = localStorage.getItem('access_token');
-                
-                try {
-                    const url = selectedApartment 
-                        ? `/api/v1/dashboard/monthly?year=2025&apartment_code=${selectedApartment}`
-                        : '/api/v1/dashboard/monthly?year=2025';
-                        
-                    const response = await fetch(url, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'X-Account-ID': currentAccountId
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        displayMonthlyChart(data);
-                        displayYearlyStats(data);
-                    }
-                } catch (error) {
-                    console.error('Error filtering data:', error);
-                }
             }
 
             function openReports() {
