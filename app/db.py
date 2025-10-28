@@ -74,8 +74,9 @@ if "postgresql" in DATABASE_URL:
     try:
         # Configuración optimizada para Render PostgreSQL
         connect_args = {
-            "connect_timeout": 60,
-            "application_name": "ses-gastos-render"
+            "connect_timeout": 30,
+            "application_name": "ses-gastos-render",
+            "sslmode": "require"
         }
         
         engine = create_engine(
@@ -109,6 +110,16 @@ if "postgresql" in DATABASE_URL:
     except Exception as pg_error:
         print(f"[DB] ❌ PostgreSQL falló después de {max_retries} intentos: {pg_error}")
         print(f"[DB] 🔍 URL problemática: {masked}")
+        print(f"[DB] 🔍 Tipo de error: {type(pg_error).__name__}")
+        
+        # Información adicional para debugging
+        import sys
+        print(f"[DB] 🐍 Python version: {sys.version}")
+        try:
+            import psycopg
+            print(f"[DB] 📦 psycopg version: {psycopg.__version__}")
+        except ImportError as imp_err:
+            print(f"[DB] ❌ psycopg import error: {imp_err}")
         
         # En producción, usar SQLite como fallback temporal
         print("[DB] ⚠️ PostgreSQL falló, usando SQLite como fallback temporal")
@@ -118,6 +129,7 @@ if "postgresql" in DATABASE_URL:
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
         print(f"[DB] 📁 SQLite temporal: {db_dir}/ses_gastos.db")
         print("[DB] 💡 Esto permite que la app funcione mientras se arregla PostgreSQL")
+        print("[DB] 🚨 IMPORTANTE: Los datos se perderán en cada despliegue hasta que PostgreSQL funcione")
 else:
     print("[DB] 📁 Usando SQLite (desarrollo)...")
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
