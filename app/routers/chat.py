@@ -424,10 +424,41 @@ async def create_expense_from_data(
     """Crear gasto en la base de datos"""
     
     try:
+        from datetime import datetime, date
+        
+        # Convertir fecha string a objeto date si es necesario
+        expense_date = expense_data.get("date")
+        if isinstance(expense_date, str):
+            try:
+                # Intentar parsear diferentes formatos de fecha
+                if len(expense_date) == 10:  # YYYY-MM-DD
+                    expense_date = datetime.strptime(expense_date, "%Y-%m-%d").date()
+                elif len(expense_date) == 8:  # YYYYMMDD
+                    expense_date = datetime.strptime(expense_date, "%Y%m%d").date()
+                elif "/" in expense_date:  # DD/MM/YYYY o MM/DD/YYYY
+                    # Intentar formato europeo primero
+                    try:
+                        expense_date = datetime.strptime(expense_date, "%d/%m/%Y").date()
+                    except:
+                        expense_date = datetime.strptime(expense_date, "%m/%d/%Y").date()
+                elif "-" in expense_date and len(expense_date) > 10:  # Con hora
+                    expense_date = datetime.fromisoformat(expense_date.split('T')[0]).date()
+                else:
+                    # Si no se puede parsear, usar fecha actual
+                    expense_date = date.today()
+            except Exception as parse_error:
+                print(f"Error parseando fecha '{expense_date}': {parse_error}")
+                expense_date = date.today()
+        elif expense_date is None:
+            expense_date = date.today()
+        elif not isinstance(expense_date, date):
+            # Si no es string ni date, convertir a fecha actual
+            expense_date = date.today()
+        
         # Crear objeto de gasto
         expense = models.Expense(
             apartment_id=apartment.id,
-            date=expense_data.get("date"),
+            date=expense_date,
             amount_gross=expense_data.get("amount_gross", 0),
             currency=expense_data.get("currency", "EUR"),
             category=expense_data.get("category"),
