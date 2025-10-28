@@ -245,6 +245,67 @@ def test_postgres_connection():
             "database_url_masked": database_url.replace(database_url.split('@')[0].split(':')[-1], "***") if '@' in database_url else database_url
         }
 
+@app.get("/debug/force-postgres-test")
+def force_postgres_test():
+    """Forzar test de PostgreSQL con la URL exacta del entorno"""
+    try:
+        import os
+        from sqlalchemy import create_engine, text
+        
+        # Obtener URL exacta del entorno
+        original_url = os.getenv("DATABASE_URL")
+        if not original_url:
+            return {"success": False, "error": "DATABASE_URL no está configurada"}
+        
+        # Mostrar URL original (enmascarada)
+        masked_original = original_url.replace(original_url.split('@')[0].split(':')[-1], "***") if '@' in original_url else original_url
+        
+        # Intentar diferentes variantes de la URL
+        test_results = []
+        
+        # Test 1: URL original
+        try:
+            engine1 = create_engine(original_url, connect_args={"connect_timeout": 5})
+            with engine1.connect() as conn:
+                version = conn.execute(text("SELECT 1")).scalar()
+                test_results.append({"variant": "original", "success": True, "url": masked_original})
+        except Exception as e:
+            test_results.append({"variant": "original", "success": False, "error": str(e), "url": masked_original})
+        
+        # Test 2: Con psycopg driver
+        if original_url.startswith("postgresql://"):
+            psycopg_url = original_url.replace("postgresql://", "postgresql+psycopg://", 1)
+            masked_psycopg = psycopg_url.replace(psycopg_url.split('@')[0].split(':')[-1], "***") if '@' in psycopg_url else psycopg_url
+            try:
+                engine2 = create_engine(psycopg_url, connect_args={"connect_timeout": 5, "sslmode": "require"})
+                with engine2.connect() as conn:
+                    version = conn.execute(text("SELECT 1")).scalar()
+                    test_results.append({"variant": "psycopg_ssl", "success": True, "url": masked_psycopg})
+            except Exception as e:
+                test_results.append({"variant": "psycopg_ssl", "success": False, "error": str(e), "url": masked_psycopg})
+        
+        # Test 3: Sin SSL
+        if original_url.startswith("postgresql://"):
+            psycopg_url = original_url.replace("postgresql://", "postgresql+psycopg://", 1)
+            masked_psycopg = psycopg_url.replace(psycopg_url.split('@')[0].split(':')[-1], "***") if '@' in psycopg_url else psycopg_url
+            try:
+                engine3 = create_engine(psycopg_url, connect_args={"connect_timeout": 5})
+                with engine3.connect() as conn:
+                    version = conn.execute(text("SELECT 1")).scalar()
+                    test_results.append({"variant": "psycopg_no_ssl", "success": True, "url": masked_psycopg})
+            except Exception as e:
+                test_results.append({"variant": "psycopg_no_ssl", "success": False, "error": str(e), "url": masked_psycopg})
+        
+        return {
+            "success": True,
+            "original_url": masked_original,
+            "test_results": test_results,
+            "working_variants": [r for r in test_results if r["success"]]
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.post("/debug/create-test-user")
 def create_test_user(db: Session = Depends(get_db)):
     """Crear usuario de prueba para testing con SQLite"""
