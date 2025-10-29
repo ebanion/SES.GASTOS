@@ -525,30 +525,47 @@ def on_startup() -> None:
     try:
         from sqlalchemy import text
         
-        print("[startup] 🔍 Verificando conexión PostgreSQL...")
+        print("[startup] 🔍 Verificando conexión a base de datos...")
+        
+        # Detectar tipo de base de datos
+        db_url = str(engine.url)
+        is_sqlite = "sqlite" in db_url
+        is_postgres = "postgresql" in db_url
         
         with engine.connect() as conn:
-            # Verificación con SELECT 1
+            # Verificación con SELECT 1 (compatible con ambos)
             result = conn.execute(text("SELECT 1")).scalar()
             if result != 1:
                 raise Exception("SELECT 1 no devolvió el valor esperado")
             
-            # Obtener información de la base de datos
-            version = conn.execute(text("SELECT version()")).scalar()
-            db_name = conn.execute(text("SELECT current_database()")).scalar()
+            # Obtener información según el tipo de base de datos
+            if is_postgres:
+                version = conn.execute(text("SELECT version()")).scalar()
+                db_name = conn.execute(text("SELECT current_database()")).scalar()
+                
+                version_parts = version.split()
+                postgres_version = version_parts[1] if len(version_parts) > 1 else "desconocida"
+                
+                print(f"[startup] ✅ PostgreSQL conectado exitosamente")
+                print(f"[startup] 🎯 Base de datos: {db_name}")
+                print(f"[startup] 📊 Versión PostgreSQL: {postgres_version}")
             
-            version_parts = version.split()
-            postgres_version = version_parts[1] if len(version_parts) > 1 else "desconocida"
+            elif is_sqlite:
+                sqlite_version = conn.execute(text("SELECT sqlite_version()")).scalar()
+                print(f"[startup] ⚠️ Usando SQLite como fallback temporal")
+                print(f"[startup] 📊 Versión SQLite: {sqlite_version}")
+                print(f"[startup] 💡 PostgreSQL no disponible - La app funciona en modo temporal")
             
-            print(f"[startup] ✅ PostgreSQL conectado exitosamente")
-            print(f"[startup] 🎯 Base de datos: {db_name}")
-            print(f"[startup] 📊 Versión PostgreSQL: {postgres_version}")
-            
-    except Exception as pg_error:
-        print(f"[startup] ❌ ERROR CRÍTICO: No se pudo conectar a PostgreSQL: {pg_error}")
-        print(f"[startup] 💡 Verifica las variables de entorno DATABASE_URL")
-        # No usar SQLite como fallback - la aplicación debe fallar
-        raise RuntimeError(f"No se pudo conectar a PostgreSQL: {pg_error}")
+    except Exception as db_error:
+        print(f"[startup] ❌ ERROR: No se pudo conectar a la base de datos: {db_error}")
+        
+        # Solo fallar si es PostgreSQL sin fallback
+        db_url = str(engine.url)
+        if "sqlite" not in db_url:
+            print(f"[startup] 💡 Verifica las variables de entorno DATABASE_URL")
+            raise RuntimeError(f"No se pudo conectar a PostgreSQL: {db_error}")
+        else:
+            print(f"[startup] 🔧 SQLite se creará con las tablas...")
     
     try:
         Base.metadata.create_all(bind=engine)
