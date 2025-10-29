@@ -12,20 +12,16 @@ from sqlalchemy.engine import make_url
 # ------------------------------------------------------------
 print("[DB] 🐘 Iniciando configuración de base de datos PostgreSQL...")
 
-# Obtener DATABASE_URL de múltiples fuentes posibles
-DATABASE_URL = (
-    os.getenv("DATABASE_URL") or 
-    os.getenv("DATABASE_PRIVATE_URL") or 
-    os.getenv("POSTGRES_URL")
-)
+# ============================================================
+# SOLO usar DATABASE_URL - sin fallbacks ni alternativas
+# ============================================================
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Verificar que DATABASE_URL esté configurada
 if not DATABASE_URL:
     print("[DB] ❌ ERROR CRÍTICO: DATABASE_URL no está configurada")
-    print("[DB] 💡 Configura una de estas variables de entorno:")
-    print("[DB]    - DATABASE_URL")
-    print("[DB]    - DATABASE_PRIVATE_URL")
-    print("[DB]    - POSTGRES_URL")
+    print("[DB] 💡 Configura la variable de entorno DATABASE_URL con:")
+    print("[DB]    postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require")
     sys.exit(1)
 
 # Verificar que sea PostgreSQL
@@ -35,20 +31,16 @@ if "postgresql" not in DATABASE_URL and "postgres" not in DATABASE_URL:
     print(f"[DB] 💡 SQLite no está soportado en producción")
     sys.exit(1)
 
-print(f"[DB] ✅ DATABASE_URL encontrada desde: {
-    'DATABASE_URL' if os.getenv('DATABASE_URL') else
-    'DATABASE_PRIVATE_URL' if os.getenv('DATABASE_PRIVATE_URL') else  
-    'POSTGRES_URL' if os.getenv('POSTGRES_URL') else
-    'desconocido'
-}")
+print(f"[DB] ✅ DATABASE_URL configurada correctamente")
 
 # ------------------------------------------------------------
 # Normalización de URL para usar psycopg (v3)
 # ------------------------------------------------------------
 try:
     url = make_url(DATABASE_URL)
+    
     # Normalizar a postgresql+psycopg para usar psycopg v3
-    if url.drivername in ["postgres", "postgresql", "postgresql.psycopg"]:
+    if url.drivername in ["postgres", "postgresql"]:
         url = url.set(drivername="postgresql+psycopg")
     
     # Asegurar que tenga sslmode=require si no está presente
@@ -75,6 +67,11 @@ except Exception as url_error:
     if "sslmode=" not in DATABASE_URL:
         separator = "&" if "?" in DATABASE_URL else "?"
         DATABASE_URL += f"{separator}sslmode=require"
+    
+    # Asegurar puerto
+    if ":5432/" not in DATABASE_URL and "@" in DATABASE_URL:
+        # Insertar :5432 antes del /
+        DATABASE_URL = re.sub(r'@([^/]+)/', r'@\1:5432/', DATABASE_URL)
 
 # Logs útiles (sin password)
 masked_url = re.sub(r"://([^:@]+):[^@]+@", r"://\1:***@", DATABASE_URL)
@@ -86,6 +83,7 @@ try:
     print(f"[DB] 🔌 Puerto: {url_check.port or 5432}")
     print(f"[DB] 🔒 SSL Mode: {url_check.query.get('sslmode', 'no configurado')}")
     print(f"[DB] 🗄️  Base de datos: {url_check.database}")
+    print(f"[DB] 🌍 Host: {url_check.host}")
 except Exception as e:
     print(f"[DB] ⚠️ No se pudo verificar detalles de URL: {e}")
 
@@ -168,6 +166,7 @@ try:
                 print(f"[DB]    2. Que las credenciales sean correctas")
                 print(f"[DB]    3. Que el firewall permita conexiones al puerto 5432")
                 print(f"[DB]    4. Que sslmode=require esté configurado correctamente")
+                print(f"[DB]    5. Que el dominio completo esté en la URL (ej: .frankfurt-postgres.render.com)")
                 raise retry_error
         
 except Exception as pg_error:
@@ -176,6 +175,13 @@ except Exception as pg_error:
     print(f"[DB] 🔍 Detalles: {str(pg_error)}")
     print(f"[DB] 💡 La aplicación no puede continuar sin PostgreSQL")
     print(f"[DB] 💡 SQLite no está disponible como fallback en producción")
+    print(f"[DB]")
+    print(f"[DB] 🔧 Solución:")
+    print(f"[DB]    Configura DATABASE_URL en Render Environment con:")
+    print(f"[DB]    postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require")
+    print(f"[DB]")
+    print(f"[DB]    Ejemplo correcto:")
+    print(f"[DB]    postgresql://ses_gastos_user:PASSWORD@dpg-xxx.frankfurt-postgres.render.com:5432/ses_gastos?sslmode=require")
     sys.exit(1)
 
 # ------------------------------------------------------------
@@ -198,3 +204,4 @@ def get_db():
 print("[DB] 🎉 Configuración de base de datos completada")
 print("[DB] 📌 Sistema configurado EXCLUSIVAMENTE con PostgreSQL")
 print("[DB] 🚫 SQLite no está disponible ni como fallback")
+print("[DB] ✅ Usando SOLO la variable DATABASE_URL")
