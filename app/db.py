@@ -49,9 +49,11 @@ if DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL)
             query_params["sslmode"] = "require"
             url = url.set(query=query_params)
         
-        # Verificar puerto
+        # Verificar puerto - solo asignar si es None
+        # No sobrescribir puertos no estándar (ej: Aiven usa 12417)
         if url.port is None:
             url = url.set(port=5432)
+            print(f"[DB] ℹ️ Puerto no especificado, usando :5432 por defecto")
             
         DATABASE_URL = str(url)
         
@@ -77,8 +79,12 @@ if DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL)
             separator = "&" if "?" in DATABASE_URL else "?"
             DATABASE_URL += f"{separator}sslmode=require"
         
-        if ":5432/" not in DATABASE_URL and "@" in DATABASE_URL:
+        # Solo añadir puerto si NO existe ningún puerto
+        # No forzar 5432, respetar puerto existente (ej: Aiven usa 12417)
+        if "@" in DATABASE_URL and not re.search(r'@[^/]+:\d+/', DATABASE_URL):
+            # No hay puerto, añadir :5432 por defecto
             DATABASE_URL = re.sub(r'@([^/:]+)/', r'@\1:5432/', DATABASE_URL)
+            print(f"[DB] ℹ️ Puerto no especificado, usando :5432 por defecto")
     
     # Logs (sin password)
     masked_url = re.sub(r"://([^:@]+):[^@]+@", r"://\1:***@", DATABASE_URL)
