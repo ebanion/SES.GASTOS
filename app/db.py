@@ -34,6 +34,15 @@ if DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL)
         if url.drivername in ["postgres", "postgresql"]:
             url = url.set(drivername="postgresql+psycopg")
         
+        # 🔧 CRÍTICO: Convertir host externo a interno para Render
+        # Render requiere usar el host interno cuando la app corre dentro de Render
+        if url.host and ".render.com" in url.host:
+            internal_host = url.host.split(".")[0]  # Extraer solo dpg-xxxxx-a
+            print(f"[DB] 🔄 Convirtiendo host externo a interno:")
+            print(f"[DB]    Externo: {url.host}")
+            print(f"[DB]    Interno: {internal_host}")
+            url = url.set(host=internal_host)
+        
         # Asegurar sslmode=require
         query_params = dict(url.query)
         if "sslmode" not in query_params:
@@ -53,6 +62,16 @@ if DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL)
             DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
         elif DATABASE_URL.startswith("postgresql://"):
             DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+        
+        # Convertir host externo a interno (método manual)
+        if ".render.com" in DATABASE_URL:
+            import re as regex
+            match = regex.search(r'@([^:@]+\.render\.com)', DATABASE_URL)
+            if match:
+                external_host = match.group(1)
+                internal_host = external_host.split(".")[0]
+                DATABASE_URL = DATABASE_URL.replace(external_host, internal_host)
+                print(f"[DB] 🔄 Host convertido: {external_host} → {internal_host}")
         
         if "sslmode=" not in DATABASE_URL:
             separator = "&" if "?" in DATABASE_URL else "?"
