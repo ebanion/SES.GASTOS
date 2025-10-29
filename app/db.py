@@ -181,7 +181,7 @@ except Exception as pg_error:
     print(f"[DB]    postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require")
     print(f"[DB]")
     print(f"[DB]    Ejemplo correcto:")
-    print(f"[DB]    postgresql://ses_gastos_user:PASSWORD@dpg-xxx.frankfurt-postgres.render.com:5432/ses_gastos?sslmode=require")
+    print(f"[DB]    postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require")
     sys.exit(1)
 
 # ------------------------------------------------------------
