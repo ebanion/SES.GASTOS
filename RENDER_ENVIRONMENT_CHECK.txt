@@ -1,0 +1,73 @@
+═══════════════════════════════════════════════════════════════════════
+  ✅ VERIFICACIÓN DE RENDER ENVIRONMENT
+═══════════════════════════════════════════════════════════════════════
+
+NUEVA BASE DE DATOS: dbname_datos
+═══════════════════════════════════════════════════════════════════════
+
+🎯 VARIABLE CORRECTA EN RENDER ENVIRONMENT:
+
+Variable: DATABASE_URL
+Valor:    postgresql://dbname_datos_user:Pzo5TmCecLKblGlNCB1IqF8YXbje7D21@dpg-d410jvodl3ps73dd84vg-a:5432/dbname_datos?sslmode=require
+
+ELEMENTOS CRÍTICOS:
+✅ Usuario: dbname_datos_user
+✅ Contraseña: Pzo5TmCecLKblGlNCB1IqF8YXbje7D21
+✅ Host: dpg-d410jvodl3ps73dd84vg-a (INTERNO, sin .frankfurt-postgres.render.com)
+✅ Puerto: :5432 (DEBE estar en la URL)
+✅ Base de datos: dbname_datos
+✅ SSL: ?sslmode=require (DEBE estar en la URL)
+
+═══════════════════════════════════════════════════════════════════════
+  ⚠️ VERIFICAR EN RENDER DASHBOARD
+═══════════════════════════════════════════════════════════════════════
+
+Ve a: https://dashboard.render.com/ → ses-gastos → Environment
+
+VERIFICA QUE:
+
+1. ✅ Solo existe la variable DATABASE_URL
+2. ❌ NO existe POSTGRES_URL
+3. ❌ NO existe DATABASE_PRIVATE_URL
+4. ✅ DATABASE_URL tiene :5432 después del host
+5. ✅ DATABASE_URL termina con ?sslmode=require
+6. ✅ DATABASE_URL usa el host: dpg-d410jvodl3ps73dd84vg-a
+7. ✅ DATABASE_URL usa el usuario: dbname_datos_user
+8. ✅ DATABASE_URL usa la contraseña: Pzo5TmCecLKblGlNCB1IqF8YXbje7D21
+
+═══════════════════════════════════════════════════════════════════════
+  ❌ ELIMINAR ESTAS SI EXISTEN
+═══════════════════════════════════════════════════════════════════════
+
+En Render Environment, ELIMINA:
+- POSTGRES_URL
+- DATABASE_PRIVATE_URL
+- Cualquier URL con "ses_gastos_user"
+- Cualquier URL con "dbname_zoe8_user"
+- Cualquier URL con "dpg-d40htmumcj7s739b70b0-a"
+- Cualquier URL con "dpg-d33s6rruibrs73asgjp0-a"
+
+═══════════════════════════════════════════════════════════════════════
+  ✅ CÓDIGO VERIFICADO
+═══════════════════════════════════════════════════════════════════════
+
+✅ app/db.py - NO tiene credenciales hardcodeadas
+✅ app/config.py - NO tiene credenciales hardcodeadas
+✅ app/main.py - NO tiene credenciales hardcodeadas
+
+El código lee SOLO de os.getenv("DATABASE_URL")
+Si falla, es porque la variable en Render Environment está mal configurada.
+
+═══════════════════════════════════════════════════════════════════════
+  🔍 DESPUÉS DE ACTUALIZAR
+═══════════════════════════════════════════════════════════════════════
+
+1. Guarda cambios en Environment
+2. Render hará auto-deploy
+3. Revisa los logs
+4. Busca: [DB] ✅ PostgreSQL CONECTADO exitosamente
+
+Si ves ese mensaje, funcionó ✅
+Si ves error de autenticación, la URL está mal en Environment
+
+═══════════════════════════════════════════════════════════════════════
