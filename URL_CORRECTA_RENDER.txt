@@ -1,54 +1,69 @@
 ═══════════════════════════════════════════════════════════════════════
-  🎯 URL CORRECTA PARA RENDER ENVIRONMENT
+  🎯 URL CORRECTA PARA RENDER (ACTUALIZADA)
 ═══════════════════════════════════════════════════════════════════════
+
+Tu servicio ses-gastos está EN RENDER, así que debes usar la URL INTERNA.
 
 Variable: DATABASE_URL
 
 Valor (COPIA EXACTAMENTE):
 
+postgresql://ses_gastos_user:vXI94nnE7wvwqcCpHYgnF4robJTc2g6m@dpg-d40htmumcj7s739b70b0-a:5432/ses_gastos?sslmode=require
+
+═══════════════════════════════════════════════════════════════════════
+  🔍 DIFERENCIA: INTERNAL vs EXTERNAL
+═══════════════════════════════════════════════════════════════════════
+
+❌ URL EXTERNA (NO uses para servicios en Render):
 postgresql://ses_gastos_user:vXI94nnE7wvwqcCpHYgnF4robJTc2g6m@dpg-d40htmumcj7s739b70b0-a.frankfurt-postgres.render.com:5432/ses_gastos?sslmode=require
 
-═══════════════════════════════════════════════════════════════════════
-  🔍 COMPARACIÓN
-═══════════════════════════════════════════════════════════════════════
+✅ URL INTERNA (USA ESTA para servicios en Render):
+postgresql://ses_gastos_user:vXI94nnE7wvwqcCpHYgnF4robJTc2g6m@dpg-d40htmumcj7s739b70b0-a:5432/ses_gastos?sslmode=require
+                                                                  ↑ HOST CORTO (sin .frankfurt-postgres.render.com)
 
-❌ URL que Render te da (INCOMPLETA):
-postgresql://ses_gastos_user:vXI94nnE7wvwqcCpHYgnF4robJTc2g6m@dpg-d40htmumcj7s739b70b0-a.frankfurt-postgres.render.com/ses_gastos
-                                                                                                                      ↑ FALTA :5432 y ?sslmode=require
-
-✅ URL correcta que DEBES usar (COMPLETA):
-postgresql://ses_gastos_user:vXI94nnE7wvwqcCpHYgnF4robJTc2g6m@dpg-d40htmumcj7s739b70b0-a.frankfurt-postgres.render.com:5432/ses_gastos?sslmode=require
-                                                                                                                      ↑ CON :5432        ↑ CON ?sslmode=require
+DIFERENCIA:
+- Internal: dpg-d40htmumcj7s739b70b0-a (más rápido, dentro de Render)
+- External: dpg-d40htmumcj7s739b70b0-a.frankfurt-postgres.render.com (para conexiones externas)
 
 ═══════════════════════════════════════════════════════════════════════
-  📋 CREDENCIALES (VERIFICADAS)
+  📋 LO QUE RENDER TE DA vs LO QUE DEBES USAR
 ═══════════════════════════════════════════════════════════════════════
 
-Usuario: ses_gastos_user
-Contraseña: vXI94nnE7wvwqcCpHYgnF4robJTc2g6m
-Host: dpg-d40htmumcj7s739b70b0-a.frankfurt-postgres.render.com
-Puerto: 5432
-Base de datos: ses_gastos
-SSL Mode: require
+Render te da (INTERNA):
+postgresql://ses_gastos_user:vXI94nnE7wvwqcCpHYgnF4robJTc2g6m@dpg-d40htmumcj7s739b70b0-a/ses_gastos
+                                                                                          ↑ SIN :5432 ni ?sslmode=require
+
+Debes usar:
+postgresql://ses_gastos_user:vXI94nnE7wvwqcCpHYgnF4robJTc2g6m@dpg-d40htmumcj7s739b70b0-a:5432/ses_gastos?sslmode=require
+                                                                                          ↑ CON :5432 y ?sslmode=require
 
 ═══════════════════════════════════════════════════════════════════════
-  🚀 CONFIGURAR EN RENDER
+  🚀 CONFIGURAR EN RENDER ENVIRONMENT
 ═══════════════════════════════════════════════════════════════════════
 
 1. Ve a: https://dashboard.render.com/
 2. Selecciona: ses-gastos
 3. Ve a: Environment
 4. Busca: DATABASE_URL
-5. REEMPLAZA con la URL de arriba (completa con :5432 y ?sslmode=require)
-6. ELIMINA otras variables (POSTGRES_URL, DATABASE_PRIVATE_URL si existen)
-7. Guarda cambios
-8. Render hará auto-deploy
+5. REEMPLAZA con: postgresql://ses_gastos_user:vXI94nnE7wvwqcCpHYgnF4robJTc2g6m@dpg-d40htmumcj7s739b70b0-a:5432/ses_gastos?sslmode=require
+6. Guarda cambios
+
+═══════════════════════════════════════════════════════════════════════
+  📊 CREDENCIALES FINALES VERIFICADAS
+═══════════════════════════════════════════════════════════════════════
+
+✅ Usuario: ses_gastos_user
+✅ Contraseña: vXI94nnE7wvwqcCpHYgnF4robJTc2g6m
+✅ Host (INTERNO): dpg-d40htmumcj7s739b70b0-a
+✅ Puerto: 5432 (añadir manualmente)
+✅ Base de datos: ses_gastos
+✅ SSL: require (añadir manualmente)
 
 ═══════════════════════════════════════════════════════════════════════
   ✅ DESPUÉS DEL DEPLOY
 ═══════════════════════════════════════════════════════════════════════
 
-Deberías ver en los logs:
+Deberías ver:
 
 [DB] ✅ PostgreSQL CONECTADO exitosamente
 [DB] 🎯 Base de datos: ses_gastos
