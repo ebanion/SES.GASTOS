@@ -13,7 +13,20 @@ from sqlalchemy.engine import make_url
 print("[DB] 🐘 Iniciando configuración de base de datos PostgreSQL...")
 
 # Obtener DATABASE_URL
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL_RAW = os.getenv("DATABASE_URL")
+
+# 🔧 CRÍTICO: Strip whitespace (espacios, \n, \r, \t)
+if DATABASE_URL_RAW:
+    DATABASE_URL = DATABASE_URL_RAW.strip()
+    
+    # Debug: Detectar whitespace
+    if DATABASE_URL != DATABASE_URL_RAW:
+        print(f"[DB] ⚠️ ADVERTENCIA: DATABASE_URL contenía whitespace")
+        print(f"[DB]    Original length: {len(DATABASE_URL_RAW)}")
+        print(f"[DB]    Stripped length: {len(DATABASE_URL)}")
+        print(f"[DB]    Repr (últimos 30 chars): {repr(DATABASE_URL_RAW[-30:])}")
+else:
+    DATABASE_URL = None
 
 # Verificar que DATABASE_URL esté configurada
 if not DATABASE_URL:
@@ -34,14 +47,25 @@ if DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL)
         if url.drivername in ["postgres", "postgresql"]:
             url = url.set(drivername="postgresql+psycopg")
         
-        # 🔧 CRÍTICO: Convertir host externo a interno para Render
-        # Render requiere usar el host interno cuando la app corre dentro de Render
-        if url.host and ".render.com" in url.host:
+        # 🔧 CRÍTICO: Convertir host externo a interno SOLO para Render PostgreSQL
+        # ⚠️ NO APLICAR a otros proveedores (Aiven, Railway, etc.)
+        is_render_postgres = (
+            url.host and 
+            ".render.com" in url.host and 
+            url.host.startswith("dpg-") and
+            ".postgres.render.com" in url.host
+        )
+        
+        if is_render_postgres:
             internal_host = url.host.split(".")[0]  # Extraer solo dpg-xxxxx-a
-            print(f"[DB] 🔄 Convirtiendo host externo a interno:")
+            print(f"[DB] 🔄 Convirtiendo host externo a interno (Render PostgreSQL):")
             print(f"[DB]    Externo: {url.host}")
             print(f"[DB]    Interno: {internal_host}")
             url = url.set(host=internal_host)
+        elif ".render.com" in url.host:
+            print(f"[DB] ℹ️ Host Render detectado pero no es PostgreSQL managed: {url.host}")
+        elif ".aivencloud.com" in url.host or ".railway.app" in url.host:
+            print(f"[DB] ℹ️ Proveedor externo detectado: {url.host} (sin modificaciones)")
         
         # Asegurar sslmode=require
         query_params = dict(url.query)
@@ -89,6 +113,20 @@ if DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL)
     # Logs (sin password)
     masked_url = re.sub(r"://([^:@]+):[^@]+@", r"://\1:***@", DATABASE_URL)
     print(f"[DB] 🔗 Conexión PostgreSQL: {masked_url}")
+    
+    # 🔍 Debug adicional (solo si DEBUG=1)
+    if os.getenv("DEBUG") == "1":
+        try:
+            # Extraer password para verificar longitud
+            import re as debug_re
+            pass_match = debug_re.search(r'://[^:]+:([^@]+)@', DATABASE_URL)
+            if pass_match:
+                password_length = len(pass_match.group(1))
+                print(f"[DB] 🔍 DEBUG: Password length = {password_length} chars")
+                print(f"[DB] 🔍 DEBUG: URL total length = {len(DATABASE_URL)} chars")
+                print(f"[DB] 🔍 DEBUG: URL repr (primeros 60): {repr(DATABASE_URL[:60])}")
+        except Exception as debug_err:
+            print(f"[DB] 🔍 DEBUG: Error en debug logging: {debug_err}")
     
     try:
         url_check = make_url(DATABASE_URL)
@@ -171,16 +209,30 @@ if DATABASE_URL and ("postgresql" in DATABASE_URL or "postgres" in DATABASE_URL)
             
     except Exception as pg_error:
         print(f"[DB] ❌ PostgreSQL falló: {pg_error}")
-        print(f"[DB] ⚠️ USANDO SQLITE COMO FALLBACK TEMPORAL")
+        
+        # 🔧 CRÍTICO: Solo fallback si NO es error de autenticación
+        error_msg = str(pg_error).lower()
+        is_auth_error = "authentication failed" in error_msg or "password" in error_msg
+        
+        if is_auth_error:
+            print(f"[DB] 🚨 ERROR DE AUTENTICACIÓN - NO HAY FALLBACK")
+            print(f"[DB]")
+            print(f"[DB] 💡 Posibles causas:")
+            print(f"[DB]    1. DATABASE_URL contiene whitespace (\\n, \\r, espacios)")
+            print(f"[DB]    2. Password incorrecta o mal copiada")
+            print(f"[DB]    3. Firewall bloqueando conexión (Aiven/Render)")
+            print(f"[DB]")
+            print(f"[DB] 🔧 Soluciones:")
+            print(f"[DB]    1. Ejecuta: python diagnose_aiven.py (en Render Shell)")
+            print(f"[DB]    2. Añade DEBUG=1 en Render Environment para ver password length")
+            print(f"[DB]    3. Verifica firewall en Aiven Dashboard → Networking")
+            print(f"[DB]    4. Usa el botón 'Copy' en Aiven para copiar la URL exacta")
+            
+            raise RuntimeError(f"PostgreSQL authentication failed: {pg_error}")
+        
+        # Fallback solo para otros errores (timeout, network, etc.)
+        print(f"[DB] ⚠️ USANDO SQLITE COMO FALLBACK TEMPORAL (error no crítico)")
         print(f"[DB] 📁 Archivo: /opt/render/project/src/ses_gastos_persistent.db")
-        print(f"[DB]")
-        print(f"[DB] 🔧 PARA ARREGLAR POSTGRESQL:")
-        print(f"[DB]    1. Ve a Render Dashboard → Databases → dbname_datos")
-        print(f"[DB]    2. Verifica que el estado sea 'Available'")
-        print(f"[DB]    3. Copia la 'Internal Connection String' con el botón Copy")
-        print(f"[DB]    4. Añade :5432 después del host")
-        print(f"[DB]    5. Añade ?sslmode=require al final")
-        print(f"[DB]    6. Actualiza DATABASE_URL en ses-gastos → Environment")
         
         DATABASE_URL = "sqlite:///ses_gastos_persistent.db"
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
