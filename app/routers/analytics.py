@@ -3,7 +3,7 @@ Router de Analytics Financieros y Fiscales
 KPIs hoteleros, salud financiera, predicciones e impuestos
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, Path
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -386,8 +386,8 @@ def get_expense_analysis(
 
 @router.get("/fiscal/iva/{year}/{quarter}", response_model=QuarterlyIVAOut)
 def calculate_quarterly_iva(
-    year: int = Query(..., ge=2020, le=2030),
-    quarter: int = Query(..., ge=1, le=4, description="Trimestre (1-4)"),
+    year: int = Path(..., ge=2020, le=2030, description="Año fiscal"),
+    quarter: int = Path(..., ge=1, le=4, description="Trimestre (1-4)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -411,9 +411,9 @@ def calculate_quarterly_iva(
 
 @router.get("/fiscal/irpf/{year}/{quarter}", response_model=QuarterlyIRPFOut)
 def calculate_quarterly_irpf(
-    year: int = Query(..., ge=2020, le=2030),
-    quarter: int = Query(..., ge=1, le=4),
-    regime: str = Query("general", regex="^(general|modules)$"),
+    year: int = Path(..., ge=2020, le=2030, description="Año fiscal"),
+    quarter: int = Path(..., ge=1, le=4, description="Trimestre (1-4)"),
+    regime: str = Query("general", regex="^(general|modules)$", description="Régimen fiscal"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
