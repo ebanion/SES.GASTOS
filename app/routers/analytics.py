@@ -44,36 +44,31 @@ def get_user_account_id(user: User, db: Session) -> str:
 # ==================== FRONTEND ====================
 
 @router.get("/", response_class=HTMLResponse)
-async def analytics_dashboard_page(
-    request: Request,
-    current_user: User = Depends(get_current_user)
-):
+async def analytics_dashboard_page(request: Request):
     """
     Renderiza el dashboard de analytics (frontend estándar)
+    PÚBLICO - La autenticación se maneja en el frontend con localStorage
     """
     return templates.TemplateResponse(
         "analytics_dashboard.html",
         {
             "request": request,
-            "user": current_user
+            "user": None
         }
     )
 
 
 @router.get("/pro", response_class=HTMLResponse)
-async def analytics_dashboard_pro_page(
-    request: Request,
-    current_user: User = Depends(get_current_user)
-):
+async def analytics_dashboard_pro_page(request: Request):
     """
     Renderiza el dashboard de analytics AVANZADO (Power BI-style)
-    Versión PRO con visualizaciones profesionales y UX mejorada
+    PÚBLICO - La autenticación se maneja en el frontend con localStorage
     """
     return templates.TemplateResponse(
         "analytics_advanced.html",
         {
             "request": request,
-            "user": current_user
+            "user": None
         }
     )
 
