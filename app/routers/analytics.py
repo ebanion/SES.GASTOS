@@ -105,6 +105,36 @@ async def analytics_demo_pro_page(request: Request):
     )
 
 
+@router.get("/open", response_class=HTMLResponse)
+async def analytics_open_page(request: Request):
+    """
+    ACCESO ABIERTO al dashboard de analytics (TEMPORAL)
+    Sin autenticación - Para testing
+    """
+    return templates.TemplateResponse(
+        "analytics_dashboard.html",
+        {
+            "request": request,
+            "user": None
+        }
+    )
+
+
+@router.get("/open/pro", response_class=HTMLResponse)
+async def analytics_open_pro_page(request: Request):
+    """
+    ACCESO ABIERTO al dashboard PRO (TEMPORAL)
+    Sin autenticación - Para testing
+    """
+    return templates.TemplateResponse(
+        "analytics_advanced.html",
+        {
+            "request": request,
+            "user": None
+        }
+    )
+
+
 @router.get("/demo/dashboard")
 async def analytics_demo_dashboard():
     """
