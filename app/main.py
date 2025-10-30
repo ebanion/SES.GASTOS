@@ -1699,17 +1699,32 @@ if dashboard_router:
         print(f"[router] ❌ Error incluyendo dashboard: {e}")
 
 # Analytics Financiero y Fiscal
+analytics_error = None
 try:
     from .routers import analytics
     app.include_router(analytics.router)
     print("[router] ✅ Analytics financiero/fiscal router incluido")
+    print(f"[router] 📊 Analytics routes registered: {len([r for r in analytics.router.routes])}")
 except Exception as e:
-    print(f"[router] ⚠️  Analytics router no disponible: {e}")
+    analytics_error = str(e)
+    print(f"[router] ❌ ERROR en Analytics router: {e}")
+    import traceback
+    print(f"[router] Stack trace: {traceback.format_exc()}")
 
 # Pequeño debug para ver rutas en producción si hace falta
 @app.get("/debug/routes")
 def list_routes():
     return sorted([getattr(r, "path", "") for r in app.router.routes])
+
+@app.get("/debug/analytics-status")
+def analytics_status():
+    """Verificar estado del router de analytics"""
+    global analytics_error
+    return {
+        "analytics_loaded": analytics_error is None,
+        "error": analytics_error,
+        "routes_with_analytics": len([r for r in app.router.routes if "/analytics" in getattr(r, "path", "")])
+    }
 
 @app.post("/fix-postgres-connection")
 def fix_postgres_connection():
