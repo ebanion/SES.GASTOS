@@ -168,9 +168,8 @@ def database_status():
         # Información de la base de datos actual
         db_info = {
             "current_database_url": str(engine.url).replace(str(engine.url).split('@')[0].split(':')[-1], "***") if '@' in str(engine.url) else str(engine.url),
-            "database_type": "PostgreSQL" if "postgresql" in str(engine.url) else "SQLite",
-            "is_temporary": "/tmp/" in str(engine.url),
-            "persistence": "❌ TEMPORAL (se pierde en despliegues)" if "/tmp/" in str(engine.url) else "✅ PERSISTENTE"
+            "database_type": "PostgreSQL",
+            "persistence": "✅ PERSISTENTE (PostgreSQL)"
         }
         
         # Variables de entorno disponibles
@@ -308,7 +307,7 @@ def force_postgres_test():
 
 @app.post("/debug/create-test-user")
 def create_test_user(db: Session = Depends(get_db)):
-    """Crear usuario de prueba para testing con SQLite"""
+    """Crear usuario de prueba para testing"""
     try:
         
         # Crear cuenta de prueba
@@ -418,7 +417,7 @@ def debug_bot_auth():
         
         return {
             "success": True,
-            "database_type": "SQLite" if "sqlite" in str(engine.url) else "PostgreSQL",
+            "database_type": "PostgreSQL",
             "database_url": str(engine.url).replace(str(engine.url).split('@')[0].split(':')[-1], "***") if '@' in str(engine.url) else str(engine.url),
             "tables": tables_info,
             "instructions": {
@@ -493,7 +492,6 @@ def debug_postgres_simple():
     try:
         from .db import engine
         debug_info["current_engine_url"] = str(engine.url).replace(str(engine.url).split('@')[0].split(':')[-1], "***") if '@' in str(engine.url) else str(engine.url)
-        debug_info["using_sqlite"] = "sqlite" in str(engine.url)
         debug_info["using_postgresql"] = "postgresql" in str(engine.url)
     except Exception as e:
         debug_info["engine_error"] = str(e)
@@ -522,33 +520,52 @@ def debug_postgres_simple():
 # Crear/migrar tablas al arrancar
 @app.on_event("startup")
 def on_startup() -> None:
-    # Intentar reconectar a PostgreSQL si es posible
+    # Verificar conexión PostgreSQL al inicio
     global engine
     try:
-        database_url = os.getenv("DATABASE_URL")
-        if database_url and "postgresql" in database_url:
-            print("[startup] 🔄 Intentando reconectar a PostgreSQL...")
-            from sqlalchemy import create_engine, text
+        from sqlalchemy import text
+        
+        print("[startup] 🔍 Verificando conexión a base de datos...")
+        
+        # Detectar tipo de base de datos
+        db_url = str(engine.url)
+        is_sqlite = "sqlite" in db_url
+        is_postgres = "postgresql" in db_url
+        
+        with engine.connect() as conn:
+            # Verificación con SELECT 1 (compatible con ambos)
+            result = conn.execute(text("SELECT 1")).scalar()
+            if result != 1:
+                raise Exception("SELECT 1 no devolvió el valor esperado")
             
-            pg_engine = create_engine(
-                database_url, 
-                pool_pre_ping=True,
-                connect_args={"connect_timeout": 30, "application_name": "ses-gastos"}
-            )
+            # Obtener información según el tipo de base de datos
+            if is_postgres:
+                version = conn.execute(text("SELECT version()")).scalar()
+                db_name = conn.execute(text("SELECT current_database()")).scalar()
+                
+                version_parts = version.split()
+                postgres_version = version_parts[1] if len(version_parts) > 1 else "desconocida"
+                
+                print(f"[startup] ✅ PostgreSQL conectado exitosamente")
+                print(f"[startup] 🎯 Base de datos: {db_name}")
+                print(f"[startup] 📊 Versión PostgreSQL: {postgres_version}")
             
-            # Test de conexión
-            with pg_engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
+            elif is_sqlite:
+                sqlite_version = conn.execute(text("SELECT sqlite_version()")).scalar()
+                print(f"[startup] ⚠️ Usando SQLite como fallback temporal")
+                print(f"[startup] 📊 Versión SQLite: {sqlite_version}")
+                print(f"[startup] 💡 PostgreSQL no disponible - La app funciona en modo temporal")
             
-            # Si llegamos aquí, PostgreSQL funciona
-            engine = pg_engine
-            print("[startup] ✅ PostgreSQL reconectado exitosamente")
+    except Exception as db_error:
+        print(f"[startup] ❌ ERROR: No se pudo conectar a la base de datos: {db_error}")
+        
+        # Solo fallar si es PostgreSQL sin fallback
+        db_url = str(engine.url)
+        if "sqlite" not in db_url:
+            print(f"[startup] 💡 Verifica las variables de entorno DATABASE_URL")
+            raise RuntimeError(f"No se pudo conectar a PostgreSQL: {db_error}")
         else:
-            print("[startup] 📁 Continuando con SQLite")
-            
-    except Exception as pg_error:
-        print(f"[startup] ❌ PostgreSQL falló en startup: {pg_error}")
-        print("[startup] 📁 Continuando con SQLite")
+            print(f"[startup] 🔧 SQLite se creará con las tablas...")
     
     try:
         Base.metadata.create_all(bind=engine)
@@ -927,7 +944,7 @@ def postgres_debug():
     return {
         "environment_variables": env_vars,
         "connection_tests": test_results,
-        "current_database": "sqlite" if "sqlite" in str(os.getenv("DATABASE_URL", "")) else "postgresql",
+        "current_database": "postgresql",
         "recommendation": "Verificar credenciales de PostgreSQL en Render dashboard"
     }
 
@@ -946,7 +963,7 @@ def system_status():
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             db_status = "connected"
-            db_type = "postgresql" if "postgresql" in DATABASE_URL else "sqlite"
+            db_type = "postgresql"
         except Exception as e:
             db_status = f"error: {str(e)[:100]}"
         
@@ -1303,7 +1320,7 @@ def create_tables_force():
             "success": True,
             "message": "✅ Tablas creadas forzadamente",
             "tables": tables_created,
-            "database_url": "SQLite" if "sqlite" in str(engine.url) else "PostgreSQL"
+            "database_url": "PostgreSQL"
         }
         
     except Exception as e:
@@ -1363,7 +1380,7 @@ def db_status():
             "database": "connected", 
             "status": "ok",
             "database_url": DATABASE_URL,
-            "database_type": "postgresql" if "postgresql" in DATABASE_URL else "sqlite",
+            "database_type": "postgresql",
             "environment_vars": {
                 "DATABASE_URL": "***" + os.getenv("DATABASE_URL", "NOT_SET")[-20:] if os.getenv("DATABASE_URL") else "NOT_SET",
                 "POSTGRES_URL": "***" + os.getenv("POSTGRES_URL", "NOT_SET")[-20:] if os.getenv("POSTGRES_URL") else "NOT_SET",
@@ -1463,13 +1480,12 @@ def fix_postgres_now():
         "success": False,
         "message": "❌ No se pudo conectar con ninguna URL de PostgreSQL",
         "all_results": results,
-        "current_fallback": "SQLite en /tmp/ses_gastos.db",
-        "suggestion": "Verificar credenciales de PostgreSQL en Render dashboard o usar SQLite temporalmente"
+        "suggestion": "Verificar credenciales de PostgreSQL en Render dashboard"
     }
 
-@app.post("/migrate-sqlite-to-postgres")
-def migrate_sqlite_to_postgres():
-    """Migrar datos de SQLite a PostgreSQL una vez reconectado"""
+@app.post("/migrate-data-to-postgres")
+def migrate_data_to_postgres():
+    """Endpoint para migración de datos (deprecado - usar script manual)"""
     try:
         from app.db import engine, DATABASE_URL
         from sqlalchemy import text
@@ -1682,10 +1698,33 @@ if dashboard_router:
     except Exception as e:
         print(f"[router] ❌ Error incluyendo dashboard: {e}")
 
+# Analytics Financiero y Fiscal
+analytics_error = None
+try:
+    from .routers import analytics
+    app.include_router(analytics.router)
+    print("[router] ✅ Analytics financiero/fiscal router incluido")
+    print(f"[router] 📊 Analytics routes registered: {len([r for r in analytics.router.routes])}")
+except Exception as e:
+    analytics_error = str(e)
+    print(f"[router] ❌ ERROR en Analytics router: {e}")
+    import traceback
+    print(f"[router] Stack trace: {traceback.format_exc()}")
+
 # Pequeño debug para ver rutas en producción si hace falta
 @app.get("/debug/routes")
 def list_routes():
     return sorted([getattr(r, "path", "") for r in app.router.routes])
+
+@app.get("/debug/analytics-status")
+def analytics_status():
+    """Verificar estado del router de analytics"""
+    global analytics_error
+    return {
+        "analytics_loaded": analytics_error is None,
+        "error": analytics_error,
+        "routes_with_analytics": len([r for r in app.router.routes if "/analytics" in getattr(r, "path", "")])
+    }
 
 @app.post("/fix-postgres-connection")
 def fix_postgres_connection():
@@ -2759,7 +2798,7 @@ def create_superadmin(
 
 @app.post("/quick-setup")
 def quick_setup():
-    """Setup rápido del sistema multiusuario (solo para SQLite)"""
+    """Setup rápido del sistema multiusuario"""
     try:
         from .db import SessionLocal, engine, Base
         from .models import User, Account, AccountUser

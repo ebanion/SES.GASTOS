@@ -1,13 +1,20 @@
-﻿# Python
+# Python
 __pycache__/
 *.pyc
 .venv/
 .env
 
-# Local DB / artefactos
-local.db
+# Local DB / artefactos (Solo PostgreSQL en producción)
+*.db
+*.sqlite
 *.sqlite3
+local.db
+ses_gastos.db
+ses_gastos_persistent.db
 
 # Editor/OS
 .vscode/
 .DS_Store
+
+# NO ignorar .env.render.example (es documentación)
+!.env.render.example

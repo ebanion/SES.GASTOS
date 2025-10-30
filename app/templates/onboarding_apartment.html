@@ -269,7 +269,7 @@
                     <label for="code">Código del apartamento</label>
                     <input type="text" id="code" name="code" 
                            placeholder="Se genera automáticamente">
-                    <div class="help-text">Código único para el bot de Telegram</div>
+                    <div class="help-text">Código único para identificar este apartamento</div>
                     <div class="code-preview" id="codePreview">Ej: APT001</div>
                 </div>
                 <div class="form-group">
@@ -314,7 +314,7 @@
         <div class="feature-preview">
             <h3>🎯 ¿Qué podrás hacer después?</h3>
             <ul>
-                <li><strong>Bot de Telegram:</strong> Envía fotos de facturas y se procesan automáticamente</li>
+                <li><strong>Bot Interno con IA:</strong> Envía fotos de facturas y se procesan automáticamente</li>
                 <li><strong>Dashboard web:</strong> Ve todos tus gastos e ingresos organizados</li>
                 <li><strong>Gestión automática:</strong> Categorización inteligente con IA</li>
                 <li><strong>Reportes:</strong> Análisis financiero de tu apartamento</li>
@@ -426,7 +426,8 @@
                     localStorage.setItem('first_apartment_code', result.code);
                     
                     setTimeout(() => {
-                        window.location.href = '/multiuser/onboarding/telegram';
+                        // Ir directamente al dashboard (sin paso de Telegram)
+                        window.location.href = '/multiuser/dashboard';
                     }, 2000);
 
                 } else {
