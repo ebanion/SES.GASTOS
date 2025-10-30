@@ -3,7 +3,7 @@ Router de Analytics Financieros y Fiscales
 KPIs hoteleros, salud financiera, predicciones e impuestos
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -12,7 +12,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from ..db import get_db
-from ..models import AccountUser
+from ..models import AccountUser, User, Account
 from ..schemas import (
     KPIsOut, FinancialHealthOut, YearOverYearOut, ExpenseCategoryAnalysis,
     QuarterlyIVAOut, QuarterlyIRPFOut, FiscalAlertOut, TaxScenarioOut
@@ -20,9 +20,8 @@ from ..schemas import (
 from ..services.financial_analytics import FinancialAnalytics
 from ..services.fiscal_calculator import FiscalCalculator
 
-# Asumiendo que tienes un sistema de autenticación
-# Importa tu función de dependencia actual
-from ..routers.auth_multiuser import get_current_account_user
+# Sistema de autenticación multiusuario
+from ..auth_multiuser import get_current_user, get_current_account
 
 # Templates
 templates = Jinja2Templates(directory="app/templates")
@@ -30,12 +29,24 @@ templates = Jinja2Templates(directory="app/templates")
 router = APIRouter(prefix="/analytics", tags=["Analytics Financieros"])
 
 
+# Helper: obtener account_id del usuario actual
+def get_user_account_id(user: User, db: Session) -> str:
+    """Obtiene el account_id del usuario actual (primera cuenta disponible)"""
+    account_user = db.query(AccountUser).filter(AccountUser.user_id == user.id).first()
+    if not account_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario sin cuenta asignada"
+        )
+    return account_user.account_id
+
+
 # ==================== FRONTEND ====================
 
 @router.get("/", response_class=HTMLResponse)
 async def analytics_dashboard_page(
     request: Request,
-    current_user: AccountUser = Depends(get_current_account_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Renderiza el dashboard de analytics (frontend estándar)
@@ -52,7 +63,7 @@ async def analytics_dashboard_page(
 @router.get("/pro", response_class=HTMLResponse)
 async def analytics_dashboard_pro_page(
     request: Request,
-    current_user: AccountUser = Depends(get_current_account_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Renderiza el dashboard de analytics AVANZADO (Power BI-style)
@@ -260,7 +271,7 @@ def get_kpis(
     apartment_id: Optional[str] = None,
     start_date: Optional[date] = Query(None, description="Fecha inicio periodo (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="Fecha fin periodo (YYYY-MM-DD)"),
-    current_user: AccountUser = Depends(get_current_account_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -271,7 +282,7 @@ def get_kpis(
     - **RevPAR**: Revenue Per Available Room (ingreso por habitación disponible)
     """
     analytics = FinancialAnalytics(db)
-    account_id = current_user.account_id
+    account_id = get_user_account_id(current_user, db)
     
     # Si no se especifica periodo, usar mes actual
     if not start_date or not end_date:
@@ -298,7 +309,7 @@ def get_kpis(
 @router.get("/financial-health", response_model=FinancialHealthOut)
 def get_financial_health(
     period_months: int = Query(1, ge=1, le=12, description="Meses a analizar"),
-    current_user: AccountUser = Depends(get_current_account_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -313,7 +324,7 @@ def get_financial_health(
     """
     analytics = FinancialAnalytics(db)
     health_data = analytics.calculate_financial_health(
-        account_id=current_user.account_id,
+        account_id=get_user_account_id(current_user, db),
         period_months=period_months
     )
     
@@ -324,7 +335,7 @@ def get_financial_health(
 def get_year_over_year(
     start_date: date = Query(..., description="Fecha inicio periodo actual"),
     end_date: date = Query(..., description="Fecha fin periodo actual"),
-    current_user: AccountUser = Depends(get_current_account_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -337,7 +348,7 @@ def get_year_over_year(
     """
     analytics = FinancialAnalytics(db)
     comparison = analytics.compare_year_over_year(
-        account_id=current_user.account_id,
+        account_id=get_user_account_id(current_user, db),
         current_start=start_date,
         current_end=end_date
     )
@@ -349,7 +360,7 @@ def get_year_over_year(
 def get_expense_analysis(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    current_user: AccountUser = Depends(get_current_account_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -363,7 +374,7 @@ def get_expense_analysis(
     """
     analytics = FinancialAnalytics(db)
     analysis = analytics.analyze_expense_categories(
-        account_id=current_user.account_id,
+        account_id=get_user_account_id(current_user, db),
         start_date=start_date,
         end_date=end_date
     )
@@ -377,7 +388,7 @@ def get_expense_analysis(
 def calculate_quarterly_iva(
     year: int = Query(..., ge=2020, le=2030),
     quarter: int = Query(..., ge=1, le=4, description="Trimestre (1-4)"),
-    current_user: AccountUser = Depends(get_current_account_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -390,7 +401,7 @@ def calculate_quarterly_iva(
     """
     calculator = FiscalCalculator(db)
     iva_data = calculator.calculate_quarterly_iva(
-        account_id=current_user.account_id,
+        account_id=get_user_account_id(current_user, db),
         year=year,
         quarter=quarter
     )
@@ -403,7 +414,7 @@ def calculate_quarterly_irpf(
     year: int = Query(..., ge=2020, le=2030),
     quarter: int = Query(..., ge=1, le=4),
     regime: str = Query("general", regex="^(general|modules)$"),
-    current_user: AccountUser = Depends(get_current_account_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -416,7 +427,7 @@ def calculate_quarterly_irpf(
     """
     calculator = FiscalCalculator(db)
     irpf_data = calculator.calculate_quarterly_irpf(
-        account_id=current_user.account_id,
+        account_id=get_user_account_id(current_user, db),
         year=year,
         quarter=quarter,
         regime=regime
@@ -427,7 +438,7 @@ def calculate_quarterly_irpf(
 
 @router.get("/fiscal/alerts", response_model=List[FiscalAlertOut])
 def get_fiscal_alerts(
-    current_user: AccountUser = Depends(get_current_account_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -441,7 +452,7 @@ def get_fiscal_alerts(
     """
     calculator = FiscalCalculator(db)
     alerts = calculator.get_fiscal_alerts(
-        account_id=current_user.account_id
+        account_id=get_user_account_id(current_user, db)
     )
     
     return [FiscalAlertOut(**alert) for alert in alerts]
@@ -451,7 +462,7 @@ def get_fiscal_alerts(
 def simulate_tax_scenarios(
     projected_annual_income: float = Query(..., gt=0, description="Ingresos proyectados anuales"),
     projected_annual_expenses: float = Query(..., ge=0, description="Gastos proyectados anuales"),
-    current_user: AccountUser = Depends(get_current_account_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -466,7 +477,7 @@ def simulate_tax_scenarios(
     """
     calculator = FiscalCalculator(db)
     simulation = calculator.simulate_tax_scenarios(
-        account_id=current_user.account_id,
+        account_id=get_user_account_id(current_user, db),
         projected_annual_income=Decimal(str(projected_annual_income)),
         projected_annual_expenses=Decimal(str(projected_annual_expenses))
     )
@@ -478,7 +489,7 @@ def simulate_tax_scenarios(
 
 @router.get("/dashboard")
 def get_analytics_dashboard(
-    current_user: AccountUser = Depends(get_current_account_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -492,7 +503,7 @@ def get_analytics_dashboard(
     """
     analytics = FinancialAnalytics(db)
     calculator = FiscalCalculator(db)
-    account_id = current_user.account_id
+    account_id = get_user_account_id(current_user, db)
     
     # Periodo: mes actual
     today = date.today()
