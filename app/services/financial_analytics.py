@@ -33,7 +33,7 @@ class FinancialAnalytics:
         Fórmula: Total ingresos / Total noches ocupadas
         """
         query = self.db.query(
-            func.sum(Income.amount).label('total_income'),
+            func.sum(Income.amount_gross_gross).label('total_income'),
             func.count(Reservation.id).label('total_reservations')
         ).join(
             Reservation, Income.reservation_id == Reservation.id
@@ -49,8 +49,8 @@ class FinancialAnalytics:
         if start_date and end_date:
             query = query.filter(
                 and_(
-                    Income.income_date >= start_date,
-                    Income.income_date <= end_date
+                    Income.date >= start_date,
+                    Income.date <= end_date
                 )
             )
         
@@ -169,15 +169,15 @@ class FinancialAnalytics:
         
         # Calcular ingresos totales
         income_query = self.db.query(
-            func.sum(Income.amount).label('total')
+            func.sum(Income.amount_gross).label('total')
         ).join(
             Reservation, Income.reservation_id == Reservation.id
         ).join(
             Apartment, Reservation.apartment_id == Apartment.id
         ).filter(
             Apartment.account_id == account_id,
-            Income.income_date >= start_date,
-            Income.income_date <= end_date
+            Income.date >= start_date,
+            Income.date <= end_date
         )
         
         if apartment_id:
@@ -221,19 +221,19 @@ class FinancialAnalytics:
         
         # 1. Calcular ingresos y gastos
         total_income = self.db.query(
-            func.sum(Income.amount)
+            func.sum(Income.amount_gross)
         ).join(Reservation).join(Apartment).filter(
             Apartment.account_id == account_id,
-            Income.income_date >= start_date,
-            Income.income_date <= end_date
+            Income.date >= start_date,
+            Income.date <= end_date
         ).scalar() or Decimal('0.00')
         
         total_expenses = self.db.query(
-            func.sum(Expense.amount)
+            func.sum(Expense.amount_gross)
         ).join(Apartment).filter(
             Apartment.account_id == account_id,
-            Expense.expense_date >= start_date,
-            Expense.expense_date <= end_date
+            Expense.date >= start_date,
+            Expense.date <= end_date
         ).scalar() or Decimal('0.00')
         
         # 2. Calcular margen
@@ -428,11 +428,11 @@ class FinancialAnalytics:
     def _get_total_income(self, account_id: str, start_date: date, end_date: date) -> Decimal:
         """Helper: Total ingresos en un periodo"""
         total = self.db.query(
-            func.sum(Income.amount)
+            func.sum(Income.amount_gross)
         ).join(Reservation).join(Apartment).filter(
             Apartment.account_id == account_id,
-            Income.income_date >= start_date,
-            Income.income_date <= end_date
+            Income.date >= start_date,
+            Income.date <= end_date
         ).scalar()
         
         return total or Decimal('0.00')
@@ -440,11 +440,11 @@ class FinancialAnalytics:
     def _get_total_expenses(self, account_id: str, start_date: date, end_date: date) -> Decimal:
         """Helper: Total gastos en un periodo"""
         total = self.db.query(
-            func.sum(Expense.amount)
+            func.sum(Expense.amount_gross)
         ).join(Apartment).filter(
             Apartment.account_id == account_id,
-            Expense.expense_date >= start_date,
-            Expense.expense_date <= end_date
+            Expense.date >= start_date,
+            Expense.date <= end_date
         ).scalar()
         
         return total or Decimal('0.00')
@@ -474,12 +474,12 @@ class FinancialAnalytics:
         # Gastos agrupados por categoría
         expenses_by_category = self.db.query(
             Expense.category,
-            func.sum(Expense.amount).label('total'),
+            func.sum(Expense.amount_gross).label('total'),
             func.count(Expense.id).label('count')
         ).join(Apartment).filter(
             Apartment.account_id == account_id,
-            Expense.expense_date >= start_date,
-            Expense.expense_date <= end_date
+            Expense.date >= start_date,
+            Expense.date <= end_date
         ).group_by(Expense.category).all()
         
         # Benchmarks de la industria (% sobre ingresos)

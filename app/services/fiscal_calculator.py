@@ -242,7 +242,7 @@ class FiscalCalculator:
         uncategorized_expenses = self.db.query(func.count(Expense.id)).join(Apartment).filter(
             Apartment.account_id == account_id,
             Expense.category.is_(None),
-            Expense.expense_date >= date(current_year, 1, 1)
+            Expense.date >= date(current_year, 1, 1)
         ).scalar()
         
         if uncategorized_expenses > 5:
@@ -370,11 +370,11 @@ class FiscalCalculator:
     def _get_total_income(self, account_id: str, start_date: date, end_date: date) -> Decimal:
         """Total ingresos en un periodo"""
         total = self.db.query(
-            func.sum(Income.amount)
+            func.sum(Income.amount_gross)
         ).join(Reservation).join(Apartment).filter(
             Apartment.account_id == account_id,
-            Income.income_date >= start_date,
-            Income.income_date <= end_date
+            Income.date >= start_date,
+            Income.date <= end_date
         ).scalar()
         
         return total or Decimal('0.00')
@@ -383,11 +383,11 @@ class FiscalCalculator:
         """Total gastos deducibles en un periodo"""
         # En producción, filtrar por gastos marcados como deducibles
         total = self.db.query(
-            func.sum(Expense.amount)
+            func.sum(Expense.amount_gross)
         ).join(Apartment).filter(
             Apartment.account_id == account_id,
-            Expense.expense_date >= start_date,
-            Expense.expense_date <= end_date
+            Expense.date >= start_date,
+            Expense.date <= end_date
         ).scalar()
         
         return total or Decimal('0.00')
