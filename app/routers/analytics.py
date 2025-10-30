@@ -67,6 +67,192 @@ async def analytics_dashboard_pro_page(
     )
 
 
+# ==================== DEMO PÚBLICO (Sin autenticación) ====================
+
+@router.get("/demo", response_class=HTMLResponse)
+async def analytics_demo_page(request: Request):
+    """
+    DEMO PÚBLICO del dashboard de analytics (sin autenticación)
+    Versión de prueba con datos de ejemplo
+    """
+    return templates.TemplateResponse(
+        "analytics_dashboard.html",
+        {
+            "request": request,
+            "user": None
+        }
+    )
+
+
+@router.get("/demo/pro", response_class=HTMLResponse)
+async def analytics_demo_pro_page(request: Request):
+    """
+    DEMO PÚBLICO del dashboard PRO (sin autenticación)
+    Versión de prueba con datos de ejemplo
+    """
+    return templates.TemplateResponse(
+        "analytics_advanced.html",
+        {
+            "request": request,
+            "user": None
+        }
+    )
+
+
+@router.get("/demo/dashboard")
+async def analytics_demo_dashboard():
+    """
+    DEMO: Dashboard integrado con datos de ejemplo
+    """
+    from datetime import datetime, timedelta
+    
+    return {
+        "period": {
+            "label": f"{datetime.now().strftime('%B %Y')}",
+            "start_date": (datetime.now().replace(day=1)).isoformat(),
+            "end_date": datetime.now().isoformat()
+        },
+        "financial_health": {
+            "score": 85,
+            "status": "green",
+            "message": "Tu negocio está en un punto óptimo con márgenes saludables y ocupación superior al 75%",
+            "margin_percent": 42.3,
+            "occupancy_rate": 78.5,
+            "expense_ratio": 32.1,
+            "net_profit": 2430.00,
+            "total_income": 5400.00,
+            "total_expenses": 2970.00
+        },
+        "kpis": {
+            "adr": 142.50,
+            "occupancy_rate": 78.5,
+            "revpar": 111.86,
+            "total_reservations": 18,
+            "nights_occupied": 38,
+            "nights_available": 48
+        },
+        "income_comparison": {
+            "current_month": 5400.00,
+            "previous_month": 4800.00,
+            "change_amount": 600.00,
+            "change_percent": 12.5
+        },
+        "alerts": [
+            {
+                "title": "Vencimiento IVA próximo",
+                "message": "Modelo 303 vence en 8 días: 20 de enero",
+                "severity": "warning",
+                "icon": "⚠️",
+                "due_date": (datetime.now() + timedelta(days=8)).isoformat()
+            },
+            {
+                "title": "Umbral de IVA deducible",
+                "message": "Has superado el 80% del límite trimestral",
+                "severity": "info",
+                "icon": "💰",
+                "due_date": None
+            },
+            {
+                "title": "Gastos sin categorizar",
+                "message": "12 transacciones pendientes de categorizar",
+                "severity": "warning",
+                "icon": "📊",
+                "due_date": None
+            }
+        ]
+    }
+
+
+@router.get("/demo/expense-analysis")
+async def analytics_demo_expenses():
+    """
+    DEMO: Análisis de gastos con datos de ejemplo
+    """
+    return [
+        {
+            "category": "Limpieza",
+            "total_amount": 648.00,
+            "percent_of_income": 12.0,
+            "benchmark_percent": 10.0,
+            "status": "optimal",
+            "recommendation": "Tu gasto en limpieza está dentro del rango óptimo del sector (10-15%)",
+            "transaction_count": 32
+        },
+        {
+            "category": "Mantenimiento",
+            "total_amount": 432.00,
+            "percent_of_income": 8.0,
+            "benchmark_percent": 6.0,
+            "status": "high",
+            "recommendation": "Tu gasto en mantenimiento es alto. Considera negociar contratos o buscar alternativas",
+            "transaction_count": 18
+        },
+        {
+            "category": "Suministros",
+            "total_amount": 594.00,
+            "percent_of_income": 11.0,
+            "benchmark_percent": 9.0,
+            "status": "very_high",
+            "recommendation": "Gastos en suministros exceden el benchmark. Optimiza consumo energético y revisa tarifas",
+            "transaction_count": 45
+        },
+        {
+            "category": "Marketing",
+            "total_amount": 270.00,
+            "percent_of_income": 5.0,
+            "benchmark_percent": 7.0,
+            "status": "optimal",
+            "recommendation": "Gasto en marketing está optimizado. Considera aumentar si buscas más visibilidad",
+            "transaction_count": 8
+        }
+    ]
+
+
+@router.get("/demo/fiscal/simulate")
+async def analytics_demo_fiscal_simulate():
+    """
+    DEMO: Simulador fiscal con datos de ejemplo
+    """
+    return {
+        "projected_annual_income": 60000.00,
+        "projected_annual_expenses": 30000.00,
+        "projected_net_income": 30000.00,
+        "scenarios": {
+            "autonomo_general": {
+                "name": "Autónomo Régimen General",
+                "irpf": 4800.00,
+                "seguridad_social": 4560.00,
+                "total_tax": 9360.00,
+                "net_after_tax": 20640.00,
+                "effective_rate": 31.2,
+                "recommended": False,
+                "note": "Alta carga fiscal para este nivel de ingresos"
+            },
+            "sociedad_limitada": {
+                "name": "Sociedad Limitada (SL)",
+                "impuesto_sociedades": 3450.00,
+                "seguridad_social": 4200.00,
+                "total_tax": 7650.00,
+                "net_after_tax": 22350.00,
+                "effective_rate": 25.5,
+                "recommended": True,
+                "note": "Régimen más eficiente para este volumen de negocio"
+            },
+            "modulos": {
+                "name": "Módulos",
+                "cuota_fija": 5200.00,
+                "iva": 2100.00,
+                "total_tax": 7300.00,
+                "net_after_tax": 22700.00,
+                "effective_rate": 24.3,
+                "recommended": False,
+                "note": "Cuota fija puede ser interesante si calificas"
+            }
+        },
+        "recommendation": "Para tu nivel de ingresos (€60,000), la Sociedad Limitada es más eficiente fiscalmente que el régimen de autónomo general, con un ahorro estimado de €1,710 anuales."
+    }
+
+
 # ==================== KPIs HOTELEROS ====================
 
 @router.get("/kpis", response_model=KPIsOut)

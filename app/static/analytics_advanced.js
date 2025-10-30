@@ -3,10 +3,22 @@
  * Power BI-inspired interface with advanced visualizations
  */
 
-const API_BASE = '/analytics';
+const IS_DEMO = window.location.pathname.includes('/demo');
+const API_BASE = IS_DEMO ? '/analytics/demo' : '/analytics';
 let authToken = null;
 let charts = {};
 let dashboardData = null;
+
+// Show demo banner if in demo mode
+if (IS_DEMO) {
+    document.addEventListener('DOMContentLoaded', function() {
+        const banner = document.createElement('div');
+        banner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(90deg, #8b5cf6, #6d28d9); color: white; padding: 12px; text-align: center; z-index: 9999; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
+        banner.innerHTML = '🎨 MODO DEMO - Datos de ejemplo | <a href="/" style="color: white; text-decoration: underline; margin-left: 12px;">Volver al inicio</a>';
+        document.body.prepend(banner);
+        document.body.style.paddingTop = '48px';
+    });
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', init);
