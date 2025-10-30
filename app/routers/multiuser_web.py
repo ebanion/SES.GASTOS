@@ -750,7 +750,7 @@ async def dashboard_page(request: Request):
                     </div>
                 </div>
                 <div>
-                    <a href="/analytics/pro" class="btn" style="background: rgba(255,255,255,0.95); color: #667eea; font-weight: 600;">
+                    <a href="/analytics/open/pro" class="btn" style="background: rgba(255,255,255,0.95); color: #667eea; font-weight: 600;">
                         📊 Analytics
                     </a>
                     <a href="/multiuser/account-selector" class="btn">Cambiar Cuenta</a>
@@ -897,7 +897,7 @@ async def dashboard_page(request: Request):
                                 <div style="padding: 4px 0;">✅ Calculadoras fiscales automáticas</div>
                                 <div style="padding: 4px 0;">✅ Simulador de regímenes fiscales</div>
                             </div>
-                            <button onclick="window.location.href='/analytics/pro'" class="btn" 
+                            <button onclick="window.location.href='/analytics/open/pro'" class="btn" 
                                     style="background: white; color: #667eea; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; font-size: 16px;">
                                 🚀 Abrir Analytics PRO
                             </button>
