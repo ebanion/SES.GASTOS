@@ -301,4 +301,105 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: Optional[str] = None
 
+# ---------- ANALYTICS FINANCIEROS ----------
+class KPIsOut(BaseModel):
+    """KPIs hoteleros principales"""
+    adr: float  # Average Daily Rate
+    occupancy_rate: float  # % ocupación
+    revpar: float  # Revenue Per Available Room
+    period_start: str
+    period_end: str
+    apartment_id: Optional[str] = None
+
+class FinancialHealthOut(BaseModel):
+    """Estado de salud financiera"""
+    status: Literal["green", "yellow", "red"]
+    score: int  # 0-100
+    margin_percent: float
+    occupancy_rate: float
+    expense_ratio: float
+    total_income: float
+    total_expenses: float
+    net_profit: float
+    message: str
+    period_days: int
+    start_date: str
+    end_date: str
+
+class YearOverYearOut(BaseModel):
+    """Comparativa año actual vs anterior"""
+    current_period: Dict[str, Any]
+    previous_period: Dict[str, Any]
+    variations: Dict[str, float]
+
+class ExpenseCategoryAnalysis(BaseModel):
+    """Análisis de gasto por categoría"""
+    category: str
+    total_amount: float
+    transaction_count: int
+    percent_of_income: float
+    benchmark_percent: float
+    status: Literal["optimal", "high", "very_high"]
+    recommendation: str
+
+# ---------- FISCAL ----------
+class QuarterlyIVAOut(BaseModel):
+    """Cálculo IVA trimestral"""
+    year: int
+    quarter: int
+    quarter_label: str
+    start_date: str
+    end_date: str
+    total_income: float
+    total_expenses: float
+    iva_repercutido: float
+    iva_soportado: float
+    iva_to_pay: float
+    iva_rate_percent: float
+    due_date: str
+    days_until_due: int
+    is_overdue: bool
+    status: str
+
+class QuarterlyIRPFOut(BaseModel):
+    """Cálculo IRPF trimestral"""
+    year: int
+    quarter: int
+    quarter_label: str
+    regime: str
+    start_date: str
+    end_date: str
+    total_income: float
+    total_expenses: float
+    net_income: float
+    irpf_base: float
+    irpf_rate_percent: float
+    irpf_calculated: float
+    previous_payments: float
+    quarterly_payment: float
+    due_date: str
+    days_until_due: int
+    is_overdue: bool
+
+class FiscalAlertOut(BaseModel):
+    """Alerta fiscal"""
+    type: str  # deadline, threshold, data_quality, planning, optimization
+    severity: str  # info, warning, error, success
+    title: str
+    message: str
+    icon: str
+    due_date: Optional[str] = None
+    amount: Optional[float] = None
+    threshold: Optional[float] = None
+    count: Optional[int] = None
+    action_url: Optional[str] = None
+
+class TaxScenarioOut(BaseModel):
+    """Simulación de escenarios fiscales"""
+    projected_annual_income: float
+    projected_annual_expenses: float
+    projected_net_income: float
+    scenarios: Dict[str, Any]
+    recommendation: str
+
 

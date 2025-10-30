@@ -1698,6 +1698,14 @@ if dashboard_router:
     except Exception as e:
         print(f"[router] ❌ Error incluyendo dashboard: {e}")
 
+# Analytics Financiero y Fiscal
+try:
+    from .routers import analytics
+    app.include_router(analytics.router)
+    print("[router] ✅ Analytics financiero/fiscal router incluido")
+except Exception as e:
+    print(f"[router] ⚠️  Analytics router no disponible: {e}")
+
 # Pequeño debug para ver rutas en producción si hace falta
 @app.get("/debug/routes")
 def list_routes():
