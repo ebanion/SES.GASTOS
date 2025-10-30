@@ -3,7 +3,9 @@ Router de Analytics Financieros y Fiscales
 KPIs hoteleros, salud financiera, predicciones e impuestos
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import date, datetime
@@ -22,8 +24,47 @@ from ..services.fiscal_calculator import FiscalCalculator
 # Importa tu función de dependencia actual
 from ..routers.auth_multiuser import get_current_account_user
 
+# Templates
+templates = Jinja2Templates(directory="app/templates")
 
 router = APIRouter(prefix="/analytics", tags=["Analytics Financieros"])
+
+
+# ==================== FRONTEND ====================
+
+@router.get("/", response_class=HTMLResponse)
+async def analytics_dashboard_page(
+    request: Request,
+    current_user: AccountUser = Depends(get_current_account_user)
+):
+    """
+    Renderiza el dashboard de analytics (frontend estándar)
+    """
+    return templates.TemplateResponse(
+        "analytics_dashboard.html",
+        {
+            "request": request,
+            "user": current_user
+        }
+    )
+
+
+@router.get("/pro", response_class=HTMLResponse)
+async def analytics_dashboard_pro_page(
+    request: Request,
+    current_user: AccountUser = Depends(get_current_account_user)
+):
+    """
+    Renderiza el dashboard de analytics AVANZADO (Power BI-style)
+    Versión PRO con visualizaciones profesionales y UX mejorada
+    """
+    return templates.TemplateResponse(
+        "analytics_advanced.html",
+        {
+            "request": request,
+            "user": current_user
+        }
+    )
 
 
 # ==================== KPIs HOTELEROS ====================

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Pro | SES Gastos</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            position: fixed;
+            left: 0;
+            top: 0;
+            padding: 24px;
+            box-shadow: 4px 0 12px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .sidebar-logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-logo i {
+            margin-right: 12px;
+            color: #8b5cf6;
+        }
+        
+        .sidebar-menu-item {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 12px;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-menu-item:hover {
+            background: rgba(139, 92, 246, 0.2);
+            color: white;
+        }
+        
+        .sidebar-menu-item.active {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+        }
+        
+        .sidebar-menu-item i {
+            width: 24px;
+            margin-right: 12px;
+        }
+        
+        .main-content {
+            margin-left: 280px;
+            padding: 32px;
+            min-height: 100vh;
+        }
+        
+        .power-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .power-card:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            transform: translateY(-2px);
+        }
+        
+        .kpi-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 16px;
+            padding: 24px;
+            border: 2px solid #e2e8f0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%);
+        }
+        
+        .kpi-value {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .metric-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .metric-badge.positive {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .metric-badge.negative {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .metric-badge.neutral {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        
+        .health-circle {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        .health-circle::before {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            right: -8px;
+            bottom: -8px;
+            border-radius: 50%;
+            padding: 8px;
+            background: linear-gradient(135deg, var(--color-start) 0%, var(--color-end) 100%);
+            -webkit-mask: 
+                linear-gradient(#fff 0 0) content-box, 
+                linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+        
+        .health-circle.green {
+            --color-start: #10b981;
+            --color-end: #059669;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+        }
+        
+        .health-circle.yellow {
+            --color-start: #f59e0b;
+            --color-end: #d97706;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%);
+        }
+        
+        .health-circle.red {
+            --color-start: #ef4444;
+            --color-end: #dc2626;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 320px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        
+        .stat-item {
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .alert-item {
+            padding: 16px;
+            border-radius: 12px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+        
+        .alert-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        
+        .alert-item.warning {
+            border-color: #f59e0b;
+            background: linear-gradient(90deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%);
+        }
+        
+        .alert-item.info {
+            border-color: #3b82f6;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+        }
+        
+        .alert-item.success {
+            border-color: #10b981;
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.05) 0%, transparent 100%);
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%);
+            transition: width 0.6s ease;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-logo">
+            <i class="fas fa-chart-pie"></i>
+            Analytics Pro
+        </div>
+        
+        <nav>
+            <div class="sidebar-menu-item active" data-page="overview">
+                <i class="fas fa-home"></i>
+                Vista General
+            </div>
+            <div class="sidebar-menu-item" data-page="performance">
+                <i class="fas fa-chart-line"></i>
+                Rendimiento
+            </div>
+            <div class="sidebar-menu-item" data-page="fiscal">
+                <i class="fas fa-file-invoice-dollar"></i>
+                Fiscal
+            </div>
+            <div class="sidebar-menu-item" data-page="expenses">
+                <i class="fas fa-wallet"></i>
+                Gastos
+            </div>
+            <div class="sidebar-menu-item" data-page="forecast">
+                <i class="fas fa-crystal-ball"></i>
+                Predicciones
+            </div>
+            <div class="sidebar-menu-item" data-page="reports">
+                <i class="fas fa-file-export"></i>
+                Reportes
+            </div>
+        </nav>
+        
+        <div style="position: absolute; bottom: 24px; left: 24px; right: 24px;">
+            <div class="text-xs text-gray-400 text-center">
+                Última actualización:<br>
+                <span id="last-update">--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        
+        <!-- PAGE: Overview -->
+        <div id="page-overview" class="page-content">
+            <!-- Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Dashboard Ejecutivo</h1>
+                <p class="text-gray-600">Visión completa de tu negocio en tiempo real</p>
+            </div>
+
+            <!-- Hero: Health Status -->
+            <div class="power-card mb-8" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="flex items-center justify-between text-white">
+                    <div class="flex-1">
+                        <h2 class="text-2xl font-bold mb-4">Estado de Salud Financiera</h2>
+                        <p class="text-lg opacity-90 mb-6" id="health-hero-message">Analizando...</p>
+                        
+                        <div class="grid grid-cols-3 gap-6">
+                            <div>
+                                <p class="text-sm opacity-75 mb-1">Margen</p>
+                                <p class="text-3xl font-bold" id="hero-margin">--%</p>
+                            </div>
+                            <div>
+                                <p class="text-sm opacity-75 mb-1">Ocupación</p>
+                                <p class="text-3xl font-bold" id="hero-occupancy">--%</p>
+                            </div>
+                            <div>
+                                <p class="text-sm opacity-75 mb-1">Beneficio</p>
+                                <p class="text-3xl font-bold" id="hero-profit">€--</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="ml-12">
+                        <div class="health-circle green" id="hero-health">
+                            <span class="text-5xl font-black" id="hero-score">--</span>
+                            <span class="text-sm opacity-75 mt-2">Score</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPIs Row -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="kpi-card">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-sm font-semibold text-gray-500 uppercase tracking-wide">ADR</span>
+                        <i class="fas fa-euro-sign text-purple-600 text-xl"></i>
+                    </div>
+                    <div class="kpi-value mb-2" id="kpi-adr">€--</div>
+                    <p class="text-sm text-gray-600 mb-3">Precio medio / noche</p>
+                    <span class="metric-badge positive" id="kpi-adr-badge">
+                        <i class="fas fa-arrow-up mr-1"></i> -%
+                    </span>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Ocupación</span>
+                        <i class="fas fa-bed text-purple-600 text-xl"></i>
+                    </div>
+                    <div class="kpi-value mb-2" id="kpi-occupancy">--%</div>
+                    <p class="text-sm text-gray-600 mb-3">Tasa de ocupación</p>
+                    <span class="metric-badge positive" id="kpi-occupancy-badge">
+                        <i class="fas fa-arrow-up mr-1"></i> -%
+                    </span>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-sm font-semibold text-gray-500 uppercase tracking-wide">RevPAR</span>
+                        <i class="fas fa-chart-line text-purple-600 text-xl"></i>
+                    </div>
+                    <div class="kpi-value mb-2" id="kpi-revpar">€--</div>
+                    <p class="text-sm text-gray-600 mb-3">Revenue per room</p>
+                    <span class="metric-badge positive" id="kpi-revpar-badge">
+                        <i class="fas fa-arrow-up mr-1"></i> -%
+                    </span>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Beneficio</span>
+                        <i class="fas fa-coins text-purple-600 text-xl"></i>
+                    </div>
+                    <div class="kpi-value mb-2" id="kpi-profit">€--</div>
+                    <p class="text-sm text-gray-600 mb-3">Neto del mes</p>
+                    <span class="metric-badge positive" id="kpi-profit-badge">
+                        <i class="fas fa-arrow-up mr-1"></i> -%
+                    </span>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <!-- Revenue Trend -->
+                <div class="power-card lg:col-span-2">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Evolución de Ingresos y Gastos</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="revenue-trend-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Profit Margin -->
+                <div class="power-card">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Margen de Beneficio</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="profit-margin-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerts Section -->
+            <div class="power-card">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-bold text-gray-900">
+                        <i class="fas fa-bell text-orange-500 mr-2"></i>
+                        Alertas y Notificaciones
+                    </h3>
+                    <span class="text-sm text-gray-500" id="alerts-count">0 activas</span>
+                </div>
+                <div id="alerts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Alerts loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE: Performance (Hidden) -->
+        <div id="page-performance" class="page-content" style="display: none;">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Análisis de Rendimiento</h1>
+                <p class="text-gray-600">Comparativas y tendencias detalladas</p>
+            </div>
+
+            <!-- Year over Year -->
+            <div class="power-card mb-8">
+                <h3 class="text-xl font-bold text-gray-900 mb-6">Comparativa Año sobre Año</h3>
+                <div id="yoy-comparison">
+                    <!-- YoY data loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE: Fiscal (Hidden) -->
+        <div id="page-fiscal" class="page-content" style="display: none;">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Panel Fiscal</h1>
+                <p class="text-gray-600">Calculadoras y simuladores para España</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- IVA Calculator -->
+                <div class="power-card">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-file-invoice text-blue-600 mr-2"></i>
+                        Calculadora IVA (Modelo 303)
+                    </h3>
+                    <div id="fiscal-iva-detail">
+                        <!-- IVA details -->
+                    </div>
+                </div>
+
+                <!-- IRPF Calculator -->
+                <div class="power-card">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-receipt text-green-600 mr-2"></i>
+                        Calculadora IRPF (Modelo 130)
+                    </h3>
+                    <div id="fiscal-irpf-detail">
+                        <!-- IRPF details -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tax Simulator -->
+            <div class="power-card">
+                <h3 class="text-xl font-bold text-gray-900 mb-6">
+                    <i class="fas fa-calculator text-purple-600 mr-2"></i>
+                    Simulador de Regímenes Fiscales
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Ingresos Anuales Proyectados
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">€</span>
+                            <input type="number" id="fiscal-sim-income" 
+                                   class="w-full pl-8 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-600 focus:outline-none" 
+                                   value="60000">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Gastos Anuales Proyectados
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">€</span>
+                            <input type="number" id="fiscal-sim-expenses" 
+                                   class="w-full pl-8 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-600 focus:outline-none" 
+                                   value="30000">
+                        </div>
+                    </div>
+                </div>
+                
+                <button id="fiscal-simulate-btn" 
+                        class="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-xl hover:shadow-xl transition-all">
+                    <i class="fas fa-play mr-2"></i>
+                    Calcular Escenarios
+                </button>
+                
+                <div id="fiscal-simulation-results" class="mt-8">
+                    <!-- Results loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE: Expenses (Hidden) -->
+        <div id="page-expenses" class="page-content" style="display: none;">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Análisis de Gastos</h1>
+                <p class="text-gray-600">Optimización y benchmarking por categoría</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="power-card">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Distribución por Categoría</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="expense-donut-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="power-card">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Tu % vs Benchmark del Sector</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="expense-comparison-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="power-card">
+                <h3 class="text-lg font-bold text-gray-900 mb-6">Recomendaciones de Optimización</h3>
+                <div id="expense-recommendations">
+                    <!-- Recommendations loaded here -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="{{ url_for('static', path='/analytics_advanced.js') }}"></script>
+</body>
+</html>
