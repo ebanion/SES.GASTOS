@@ -750,6 +750,9 @@ async def dashboard_page(request: Request):
                     </div>
                 </div>
                 <div>
+                    <a href="/analytics/pro" class="btn" style="background: rgba(255,255,255,0.95); color: #667eea; font-weight: 600;">
+                        📊 Analytics
+                    </a>
                     <a href="/multiuser/account-selector" class="btn">Cambiar Cuenta</a>
                     <button onclick="logout()" class="btn">Cerrar Sesión</button>
                 </div>
@@ -885,6 +888,21 @@ async def dashboard_page(request: Request):
                     </div>
 
                     <div class="grid">
+                        <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <h3 style="color: white;">📊 Analytics Financiero & Fiscal</h3>
+                            <p>KPIs hoteleros, salud financiera, calculadoras IVA/IRPF</p>
+                            <div style="margin: 16px 0;">
+                                <div style="padding: 4px 0;">✅ ADR, Ocupación, RevPAR</div>
+                                <div style="padding: 4px 0;">✅ Análisis de gastos con benchmarking</div>
+                                <div style="padding: 4px 0;">✅ Calculadoras fiscales automáticas</div>
+                                <div style="padding: 4px 0;">✅ Simulador de regímenes fiscales</div>
+                            </div>
+                            <button onclick="window.location.href='/analytics/pro'" class="btn" 
+                                    style="background: white; color: #667eea; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; font-size: 16px;">
+                                🚀 Abrir Analytics PRO
+                            </button>
+                        </div>
+
                         <div class="card">
                             <h3>🏠 Mis Apartamentos</h3>
                             <div id="apartmentsList">
