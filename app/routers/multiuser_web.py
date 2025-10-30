@@ -35,10 +35,11 @@ async def onboarding_apartment_page(request: Request):
     """Paso 2: Configuración del primer apartamento"""
     return templates.TemplateResponse("onboarding_apartment.html", {"request": request})
 
-@router.get("/onboarding/telegram", response_class=HTMLResponse)
-async def onboarding_telegram_page(request: Request):
-    """Paso 3: Activación del bot de Telegram"""
-    return templates.TemplateResponse("onboarding_telegram.html", {"request": request})
+# ELIMINADO: Bot de Telegram - Ahora usamos solo el bot interno (chat integrado)
+# @router.get("/onboarding/telegram", response_class=HTMLResponse)
+# async def onboarding_telegram_page(request: Request):
+#     """Paso 3: Activación del bot de Telegram"""
+#     return templates.TemplateResponse("onboarding_telegram.html", {"request": request})
 
 @router.get("/test", response_class=HTMLResponse)
 async def test_page(request: Request):
@@ -592,7 +593,7 @@ async def dashboard_personal_page(request: Request):
                     document.getElementById('expensesTable').innerHTML = `
                         <div style="text-align: center; padding: 40px; color: #64748b;">
                             <p>No hay gastos registrados</p>
-                            <p><small>Usa el bot de Telegram para agregar gastos automáticamente</small></p>
+                            <p><small>Usa el chat integrado para agregar gastos automáticamente</small></p>
                         </div>
                     `;
                     return;
@@ -972,12 +973,12 @@ async def dashboard_page(request: Request):
                 const firstApartment = apartments.length > 0 ? apartments[0] : null;
                 const apartmentCode = firstApartment ? firstApartment.code : 'TU_CODIGO';
                 
-                alert(`🤖 Instrucciones del Bot:
+                alert(`🤖 Instrucciones del Chat Interno:
 
-1. Abre Telegram y busca: @UriApartment_Bot
-2. Envía: /start
-3. Envía: /usar ${apartmentCode}
-4. ¡Envía una foto de factura!
+1. Haz click en el botón '💬 Abrir Chat' arriba
+2. Selecciona tu apartamento (código: ${apartmentCode})
+3. Envía una foto de factura o escribe un gasto
+4. ¡El sistema lo procesará automáticamente!
 
 El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`);
             }
@@ -1033,7 +1034,7 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
                             <div id="recentExpenses">
                                 <p style="text-align: center; color: #666; padding: 20px;">
                                     No hay gastos registrados aún.<br>
-                                    <small>Usa el bot de Telegram para agregar gastos automáticamente.</small>
+                                    <small>Usa el chat integrado para agregar gastos automáticamente.</small>
                                 </p>
                             </div>
                         </div>
@@ -1043,10 +1044,10 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
                             <div style="padding: 16px; background: #f8f9fa; border-radius: 8px; margin-top: 12px;">
                                 <p><strong>Para agregar gastos automáticamente:</strong></p>
                                 <ol style="margin: 8px 0; padding-left: 20px;">
-                                    <li>Busca <strong>@UriApartment_Bot</strong> en Telegram</li>
-                                    <li>Envía <code>/start</code></li>
-                                    <li>Configura con <code>/usar ${apartments.length > 0 ? apartments[0].code : 'TU_CODIGO'}</code></li>
-                                    <li>¡Envía fotos de facturas!</li>
+                                    <li>Haz click en <strong>💬 Abrir Chat</strong> arriba</li>
+                                    <li>Selecciona tu apartamento</li>
+                                    <li>Envía una foto de factura o escribe el gasto</li>
+                                    <li>¡El sistema lo procesará con IA!</li>
                                 </ol>
                                 <a href="https://t.me/UriApartment_Bot" target="_blank" class="btn" 
                                    style="background: #0088cc; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; display: inline-block; margin-top: 8px;">
@@ -1131,7 +1132,7 @@ El bot procesará la factura automáticamente y creará el gasto en tu cuenta.`)
                     document.getElementById('recentExpenses').innerHTML = `
                         <p style="text-align: center; color: #666; padding: 20px;">
                             No hay gastos registrados aún.<br>
-                            <small>Usa el bot de Telegram para agregar gastos automáticamente.</small>
+                            <small>Usa el chat integrado para agregar gastos automáticamente.</small>
                         </p>
                     `;
                     return;
@@ -1629,11 +1630,10 @@ async def superadmin_panel(request: Request):
                     <a href="#" class="btn" onclick="loadStats()">Actualizar Stats</a>
                 </div>
 
-                <div class="card">
-                    <h3>🤖 Bot de Telegram</h3>
-                    <p>Estado y configuración del bot</p>
-                    <a href="/bot/status" class="btn">Estado Bot</a>
-                    <a href="/bot/diagnose" class="btn">Diagnóstico</a>
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h3 style="color: white;">🤖 Asistente con IA</h3>
+                    <p>Tu gestor automático de gastos integrado</p>
+                    <button onclick="openChat()" class="btn" style="background: white; color: #667eea;">💬 Abrir Chat</button>
                 </div>
             </div>
 
